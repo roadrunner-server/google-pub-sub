@@ -8,7 +8,7 @@ const (
 // config is used to parse pipeline configuration
 type config struct {
 	// global
-	Addr string `mapstructure:"addr"`
+	ProjectID string `mapstructure:"project_id"`
 
 	// local
 	Prefetch int    `mapstructure:"prefetch"`
