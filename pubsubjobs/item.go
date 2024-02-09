@@ -1,18 +1,18 @@
 package pubsubjobs
 
 import (
+	"strconv"
+	"sync"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
+	"cloud.google.com/go/pubsub"
 	"github.com/goccy/go-json"
+	"go.uber.org/zap"
 
-	"github.com/roadrunner-server/api/v4/plugins/v1/jobs"
-)
-
-var _ jobs.Acknowledger = (*Item)(nil)
-
-const (
-	auto string = "deduced_by_rr"
+	"github.com/roadrunner-server/api/v4/plugins/v3/jobs"
+	"github.com/roadrunner-server/errors"
 )
 
 type Item struct {
@@ -23,7 +23,7 @@ type Item struct {
 	// Payload is string data (usually JSON) passed to Job broker.
 	Payload string `json:"payload"`
 	// Headers with key-values pairs
-	Headers map[string][]string `json:"headers"`
+	headers map[string][]string `json:"headers"`
 	// Options contains set of PipelineOptions specific to job execution. Can be empty.
 	Options *Options `json:"options,omitempty"`
 }
@@ -41,6 +41,11 @@ type Options struct {
 	AutoAck bool `json:"auto_ack"`
 	// AMQP Queue
 	Queue string `json:"queue,omitempty"`
+	// Private ================
+	cond        *sync.Cond
+	message     *pubsub.Message
+	msgInFlight *int64
+	stopped     *uint64
 }
 
 // DelayDuration returns delay duration in a form of time.Duration.
@@ -56,13 +61,17 @@ func (i *Item) Priority() int64 {
 	return i.Options.Priority
 }
 
+func (i *Item) GroupID() string {
+	return i.Options.Pipeline
+}
+
 // Body packs job payload into binary payload.
 func (i *Item) Body() []byte {
 	return strToBytes(i.Payload)
 }
 
-func (i *Item) Metadata() map[string][]string {
-	return i.Headers
+func (i *Item) Headers() map[string][]string {
+	return i.headers
 }
 
 // Context packs job context (job, id) into binary payload.
@@ -80,7 +89,7 @@ func (i *Item) Context() ([]byte, error) {
 			ID:       i.Ident,
 			Job:      i.Job,
 			Driver:   pluginName,
-			Headers:  i.Headers,
+			Headers:  i.headers,
 			Queue:    i.Options.Queue,
 			Pipeline: i.Options.Pipeline,
 		},
@@ -94,10 +103,37 @@ func (i *Item) Context() ([]byte, error) {
 }
 
 func (i *Item) Ack() error {
+	if atomic.LoadUint64(i.Options.stopped) == 1 {
+		return errors.Str("failed to acknowledge the JOB, the pipeline is probably stopped")
+	}
+	defer func() {
+		i.Options.cond.Signal()
+		atomic.AddInt64(i.Options.msgInFlight, ^int64(0))
+	}()
+	// just return in case of auto-ack
+	if i.Options.AutoAck {
+		return nil
+	}
+
+	i.Options.message.Ack()
 	return nil
 }
 
 func (i *Item) Nack() error {
+	if atomic.LoadUint64(i.Options.stopped) == 1 {
+		return errors.Str("failed to acknowledge the JOB, the pipeline is probably stopped")
+	}
+	defer func() {
+		i.Options.cond.Signal()
+		atomic.AddInt64(i.Options.msgInFlight, ^int64(0))
+	}()
+	// message already deleted
+	if i.Options.AutoAck {
+		return nil
+	}
+
+	i.Options.message.Nack()
+
 	return nil
 }
 
@@ -110,21 +146,20 @@ func (i *Item) Respond(_ []byte, _ string) error {
 	return nil
 }
 
-func fromJob(job jobs.Job) *Item {
+func fromJob(job jobs.Message) *Item {
 	return &Item{
 		Job:     job.Name(),
 		Ident:   job.ID(),
-		Payload: job.Payload(),
-		Headers: job.Headers(),
+		Payload: string(job.Payload()),
+		headers: job.Headers(),
 		Options: &Options{
 			Priority: job.Priority(),
-			Pipeline: job.Pipeline(),
+			Pipeline: job.GroupID(),
 			Delay:    job.Delay(),
 			AutoAck:  job.AutoAck(),
 		},
 	}
 }
-
 func bytesToStr(data []byte) string {
 	if len(data) == 0 {
 		return ""
@@ -139,4 +174,83 @@ func strToBytes(data string) []byte {
 	}
 
 	return unsafe.Slice(unsafe.StringData(data), len(data))
+}
+
+func (c *Driver) unpack(message *pubsub.Message) *Item {
+	attributes := message.Attributes
+
+	var rrid string
+	if val, ok := attributes[jobs.RRID]; ok {
+		rrid = val
+	}
+
+	var rrj string
+	if val, ok := attributes[jobs.RRJob]; ok {
+		rrj = val
+	}
+
+	h := make(map[string][]string)
+	if val, ok := attributes[jobs.RRHeaders]; ok {
+		err := json.Unmarshal([]byte(val), &h)
+		if err != nil {
+			c.log.Debug("failed to unpack the headers, not a JSON", zap.Error(err))
+		}
+	}
+
+	var autoAck bool
+	if val, ok := attributes[jobs.RRAutoAck]; ok {
+		autoAck = stob(val)
+	}
+
+	var dl int
+	var err error
+	if val, ok := attributes[jobs.RRDelay]; ok {
+		dl, err = strconv.Atoi(val)
+		if err != nil {
+			c.log.Debug("failed to unpack the delay, not a number", zap.Error(err))
+		}
+	}
+
+	var priority int
+	if val, ok := attributes[jobs.RRPriority]; ok {
+		priority, err = strconv.Atoi(val)
+		if err != nil {
+			priority = int((*c.pipeline.Load()).Priority())
+			c.log.Debug("failed to unpack the priority; inheriting the pipeline's default priority", zap.Error(err))
+		}
+	}
+
+	return &Item{
+		Job:     rrj,
+		Ident:   rrid,
+		Payload: string(message.Data),
+		headers: h,
+		Options: &Options{
+			AutoAck:  autoAck,
+			Delay:    int64(dl),
+			Priority: int64(priority),
+			Pipeline: (*c.pipeline.Load()).Name(),
+			// private
+			message:     message,
+			msgInFlight: c.msgInFlight,
+			cond:        &c.cond,
+			stopped:     &c.stopped,
+		},
+	}
+}
+
+func btos(b bool) string {
+	if b {
+		return "true"
+	}
+
+	return "false"
+}
+
+func stob(s string) bool {
+	if s != "" {
+		return s == "true"
+	}
+
+	return false
 }

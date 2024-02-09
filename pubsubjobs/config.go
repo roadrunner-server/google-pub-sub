@@ -4,18 +4,20 @@ import "os"
 
 // pipeline rabbitmq info
 const (
-	exchangeKey string = "exchange"
+	pref                 string = "prefetch"
+	skipTopicDeclaration string = "skip_topic_declaration"
+	topic                string = "topic"
 )
 
 // config is used to parse pipeline configuration
 type config struct {
 	// global
-	ProjectID string `mapstructure:"project_id"`
-	Topic string `mapstructure:"topic"`
-	SkipTopicDeclaration bool `mapstructure:"skip_topic_declaration"`
+	ProjectID            string `mapstructure:"project_id"`
+	Topic                string `mapstructure:"topic"`
+	SkipTopicDeclaration bool   `mapstructure:"skip_topic_declaration"`
 
 	// local
-	Prefetch int    `mapstructure:"prefetch"`
+	Prefetch int32  `mapstructure:"prefetch"`
 	Priority int64  `mapstructure:"priority"`
 	Host     string `mapstructure:"host"`
 }

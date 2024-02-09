@@ -2,12 +2,14 @@ package pubsubjobs
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"cloud.google.com/go/pubsub"
+	"github.com/goccy/go-json"
 	"github.com/roadrunner-server/api/v4/plugins/v3/jobs"
 	"github.com/roadrunner-server/errors"
 	jprop "go.opentelemetry.io/contrib/propagators/jaeger"
@@ -36,14 +38,16 @@ type Driver struct {
 	mu   sync.Mutex
 	cond sync.Cond
 
-	log         *zap.Logger
-	pq          jobs.Queue
-	pipeline    atomic.Pointer[jobs.Pipeline]
-	tracer      *sdktrace.TracerProvider
-	prop        propagation.TextMapPropagator
-	consumeAll  bool
-	skipDeclare bool
-	topic       string
+	log              *zap.Logger
+	pq               jobs.Queue
+	pipeline         atomic.Pointer[jobs.Pipeline]
+	tracer           *sdktrace.TracerProvider
+	prop             propagation.TextMapPropagator
+	consumeAll       bool
+	skipDeclare      bool
+	topic            string
+	msgInFlight      *int64
+	msgInFlightLimit *int32
 
 	// if user invoke several resume operations
 	listeners uint32
@@ -93,14 +97,16 @@ func FromConfig(tracer *sdktrace.TracerProvider, configKey string, pipe jobs.Pip
 	// PARSE CONFIGURATION END -------
 
 	jb := &Driver{
-		tracer:      tracer,
-		prop:        prop,
-		log:         log,
-		skipDeclare: conf.SkipTopicDeclaration,
-		topic:       conf.Topic,
-		pq:          pq,
-		pauseCh:     make(chan struct{}, 1),
-		cond:        sync.Cond{L: &sync.Mutex{}},
+		tracer:           tracer,
+		prop:             prop,
+		log:              log,
+		skipDeclare:      conf.SkipTopicDeclaration,
+		topic:            conf.Topic,
+		pq:               pq,
+		pauseCh:          make(chan struct{}, 1),
+		cond:             sync.Cond{L: &sync.Mutex{}},
+		msgInFlightLimit: ptr(conf.Prefetch),
+		msgInFlight:      ptr(int64(0)),
 	}
 
 	ctx := context.Background()
@@ -145,14 +151,22 @@ func FromPipeline(tracer *sdktrace.TracerProvider, pipe jobs.Pipeline, log *zap.
 	// PARSE CONFIGURATION -------
 
 	jb := &Driver{
-		prop:        prop,
-		tracer:      tracer,
-		log:         log,
-		pq:          pq,
-		pauseCh:     make(chan struct{}, 1),
-		skipDeclare: conf.SkipTopicDeclaration,
-		topic:       conf.Topic,
-		cond:        sync.Cond{L: &sync.Mutex{}},
+		prop:             prop,
+		tracer:           tracer,
+		log:              log,
+		pq:               pq,
+		pauseCh:          make(chan struct{}, 1),
+		skipDeclare:      pipe.Bool(skipTopicDeclaration, false),
+		topic:            pipe.String(topic, "default"),
+		cond:             sync.Cond{L: &sync.Mutex{}},
+		msgInFlightLimit: ptr(int32(pipe.Int(pref, 10))),
+		msgInFlight:      ptr(int64(0)),
+	}
+
+	ctx := context.Background()
+	jb.client, err = pubsub.NewClient(ctx, conf.ProjectID)
+	if err != nil {
+		return nil, err
 	}
 
 	err = jb.manageTopic(context.Background())
@@ -174,7 +188,24 @@ func (d *Driver) Push(ctx context.Context, jb jobs.Message) error {
 	ctx, span := trace.SpanFromContext(ctx).TracerProvider().Tracer(tracerName).Start(ctx, "google_pub_sub_push")
 	defer span.End()
 
-	result := d.client.Topic(d.topic).Publish(ctx, &pubsub.Message{Data: jb.Payload()})
+	job := fromJob(jb)
+
+	data, err := json.Marshal(job.headers)
+	if err != nil {
+		return err
+	}
+
+	result := d.client.Topic(d.topic).Publish(ctx, &pubsub.Message{
+		Data: jb.Payload(),
+		Attributes: map[string]string{
+			jobs.RRID:       job.Ident,
+			jobs.RRJob:      job.Job,
+			jobs.RRDelay:    strconv.Itoa(int(job.Options.Delay)),
+			jobs.RRHeaders:  string(data),
+			jobs.RRPriority: strconv.Itoa(int(job.Options.Priority)),
+			jobs.RRAutoAck:  btos(job.Options.AutoAck),
+		},
+	})
 	id, err := result.Get(ctx)
 	if err != nil {
 		return err
@@ -324,4 +355,8 @@ func (d *Driver) manageTopic(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func ptr[T any](val T) *T {
+	return &val
 }

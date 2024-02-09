@@ -1,9 +1,7 @@
 package helpers
 
 import (
-	"bytes"
 	"net"
-	"net/http"
 	"net/rpc"
 	"testing"
 	"time"
@@ -162,42 +160,25 @@ func Stats(address string, state *jobState.State) func(t *testing.T) {
 	}
 }
 
-func EnableProxy(name string, t *testing.T) {
-	buf := new(bytes.Buffer)
-	buf.WriteString(`{"enabled":true}`)
+func DeclarePipe(queue string, address string, pipeline string) func(t *testing.T) {
+	return func(t *testing.T) {
+		conn, err := net.Dial("tcp", address)
+		assert.NoError(t, err)
+		client := rpc.NewClientWithCodec(goridgeRpc.NewClientCodec(conn))
 
-	resp, err := http.Post("http://127.0.0.1:8474/proxies/"+name, "application/json", buf) //nolint:noctx
-	require.NoError(t, err)
-	require.Equal(t, 200, resp.StatusCode)
-	if resp.Body != nil {
-		_ = resp.Body.Close()
-	}
-}
+		pipe := &jobsProto.DeclareRequest{Pipeline: map[string]string{
+			"driver":             "google-pub-sub",
+			"name":               pipeline,
+			"queue":              queue,
+			"prefetch":           "10",
+			"priority":           "3",
+			"visibility_timeout": "0",
+			"wait_time_seconds":  "3",
+			"tags":               `{"key":"value"}`,
+		}}
 
-func DisableProxy(name string, t *testing.T) {
-	buf := new(bytes.Buffer)
-	buf.WriteString(`{"enabled":false}`)
-
-	resp, err := http.Post("http://127.0.0.1:8474/proxies/"+name, "application/json", buf) //nolint:noctx
-	require.NoError(t, err)
-	require.Equal(t, 200, resp.StatusCode)
-	if resp.Body != nil {
-		_ = resp.Body.Close()
-	}
-}
-
-func DeleteProxy(name string, t *testing.T) {
-	client := &http.Client{}
-
-	req, err := http.NewRequest(http.MethodDelete, "http://127.0.0.1:8474/proxies/"+name, nil) //nolint:noctx
-	require.NoError(t, err)
-
-	resp, err := client.Do(req)
-	require.NoError(t, err)
-
-	require.NoError(t, err)
-	require.Equal(t, 204, resp.StatusCode)
-	if resp.Body != nil {
-		_ = resp.Body.Close()
+		er := &jobsProto.Empty{}
+		err = client.Call("jobs.Declare", pipe, er)
+		assert.NoError(t, err)
 	}
 }
