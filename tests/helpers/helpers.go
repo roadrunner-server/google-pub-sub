@@ -1,11 +1,15 @@
 package helpers
 
 import (
+	"context"
 	"net"
 	"net/rpc"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
+	"cloud.google.com/go/pubsub"
 	"github.com/google/uuid"
 	jobsProto "github.com/roadrunner-server/api/v4/build/jobs/v1"
 	jobState "github.com/roadrunner-server/api/v4/plugins/v1/jobs"
@@ -180,5 +184,46 @@ func DeclarePipe(queue string, address string, pipeline string) func(t *testing.
 		er := &jobsProto.Empty{}
 		err = client.Call("jobs.Declare", pipe, er)
 		assert.NoError(t, err)
+	}
+}
+
+func CleanEmulator() error {
+	os.Setenv("PUBSUB_EMULATOR_HOST", "127.0.0.1:8085")
+	ctx := context.Background()
+	client, err := pubsub.NewClient(ctx, "test")
+	if err != nil {
+		return err
+	}
+
+	for {
+		sub, err := client.Subscriptions(ctx).Next()
+		if err != nil {
+			if strings.Contains(err.Error(), "no more items in iterator") {
+				break;
+			}
+
+			return err
+		}
+		
+		err = sub.Delete(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	for {
+		topic, err := client.Topics(ctx).Next()
+		if err != nil {
+			if strings.Contains(err.Error(), "no more items in iterator") {
+				return nil
+			}
+
+			return err
+		}
+
+		err = topic.Delete(ctx)
+		if err != nil {
+			return err
+		}
 	}
 }

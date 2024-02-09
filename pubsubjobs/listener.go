@@ -17,13 +17,7 @@ func (d *Driver) listen(ctx context.Context) {
 				d.log.Debug("listener was stopped")
 				return
 			default:
-				s, err := d.client.Topic(d.topic).Subscriptions(ctx).Next()
-				if err != nil {
-					d.log.Error("subscription iteration", zap.Error(err))
-					continue
-				}
-				
-				s.Receive(context.Background(), func(ctx context.Context, message *pubsub.Message) {
+				d.client.Subscription(d.sub).Receive(ctx, func(ctx context.Context, message *pubsub.Message) {
 					d.cond.L.Lock()
 					// lock when we hit the limit
 					for atomic.LoadInt64(d.msgInFlight) >= int64(atomic.LoadInt32(d.msgInFlightLimit)) {
@@ -36,9 +30,14 @@ func (d *Driver) listen(ctx context.Context) {
 
 					ctxspan, span := d.tracer.Tracer(tracerName).Start(d.prop.Extract(context.Background(), propagation.HeaderCarrier(item.headers)), "google_pub_sub_listener")
 					if item.Options.AutoAck {
-						item.Ack()
+						_, err := message.AckWithResult().Get(ctx)
+						if err != nil {
+							d.log.Error("message acknowledge", zap.Error(err))
+							span.RecordError(err)
+							span.End()
+							return
+						}
 						d.log.Debug("auto ack is turned on, message acknowledged")
-						span.End()
 					}
 
 					if item.headers == nil {

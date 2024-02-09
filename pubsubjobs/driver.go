@@ -48,6 +48,7 @@ type Driver struct {
 	topic            string
 	msgInFlight      *int64
 	msgInFlightLimit *int32
+	sub              string
 
 	// if user invoke several resume operations
 	listeners uint32
@@ -107,6 +108,7 @@ func FromConfig(tracer *sdktrace.TracerProvider, configKey string, pipe jobs.Pip
 		cond:             sync.Cond{L: &sync.Mutex{}},
 		msgInFlightLimit: ptr(conf.Prefetch),
 		msgInFlight:      ptr(int64(0)),
+		sub:              pipe.Name(),
 	}
 
 	ctx := context.Background()
@@ -161,6 +163,7 @@ func FromPipeline(tracer *sdktrace.TracerProvider, pipe jobs.Pipeline, log *zap.
 		cond:             sync.Cond{L: &sync.Mutex{}},
 		msgInFlightLimit: ptr(int32(pipe.Int(pref, 10))),
 		msgInFlight:      ptr(int64(0)),
+		sub:              pipe.Name(),
 	}
 
 	ctx := context.Background()
@@ -346,13 +349,30 @@ func (d *Driver) manageTopic(ctx context.Context) error {
 		return nil
 	}
 
-	_, err := d.client.CreateTopic(ctx, d.topic)
+	topic, err := d.client.CreateTopic(ctx, d.topic)
 	if err != nil {
-		if strings.Contains(err.Error(), "Topic already exists") {
-			return nil
+		if !strings.Contains(err.Error(), "Topic already exists") {
+			return err
 		}
-		return err
+
+		topic = d.client.Topic(d.topic)
+	} else {
+		d.log.Debug("created topic", zap.String("topic", d.topic))
 	}
+
+	_, err = d.client.CreateSubscription(ctx, d.sub, pubsub.SubscriptionConfig{
+		Topic:                     topic,
+		AckDeadline:               10 * time.Second,
+		ExpirationPolicy:          time.Duration(0),
+	})
+	if err != nil {
+		if !strings.Contains(err.Error(), "Subscription already exists") {
+			return err
+		}
+	}
+	d.log.Debug("created subscription", zap.String("topic", d.topic), zap.String("subscription", d.sub))
+
+	topic.Stop()
 
 	return nil
 }

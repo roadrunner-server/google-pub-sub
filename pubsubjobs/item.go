@@ -127,6 +127,7 @@ func (i *Item) Nack() error {
 		i.Options.cond.Signal()
 		atomic.AddInt64(i.Options.msgInFlight, ^int64(0))
 	}()
+	
 	// message already deleted
 	if i.Options.AutoAck {
 		return nil
