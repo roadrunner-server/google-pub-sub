@@ -1,5 +1,7 @@
 package pubsubjobs
 
+import "os"
+
 // pipeline rabbitmq info
 const (
 	exchangeKey string = "exchange"
@@ -9,11 +11,13 @@ const (
 type config struct {
 	// global
 	ProjectID string `mapstructure:"project_id"`
+	Topic string `mapstructure:"topic"`
+	SkipTopicDeclaration bool `mapstructure:"skip_topic_declaration"`
 
 	// local
 	Prefetch int    `mapstructure:"prefetch"`
-	Queue    string `mapstructure:"queue"`
 	Priority int64  `mapstructure:"priority"`
+	Host     string `mapstructure:"host"`
 }
 
 func (c *config) InitDefault() {
@@ -25,7 +29,8 @@ func (c *config) InitDefault() {
 		c.Priority = 10
 	}
 
-	if c.Addr == "" {
-		c.Addr = "amqp://guest:guest@127.0.0.1:5672/"
+	if c.Host != "" {
+		// No possibility to set up emulator from client init
+		os.Setenv("PUBSUB_EMULATOR_HOST", c.Host)
 	}
 }
