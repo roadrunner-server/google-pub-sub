@@ -17,7 +17,7 @@ func (d *Driver) listen(ctx context.Context) {
 				d.log.Debug("listener was stopped")
 				return
 			default:
-				d.client.Subscription(d.sub).Receive(ctx, func(ctx context.Context, message *pubsub.Message) {
+				err := d.client.Subscription(d.sub).Receive(ctx, func(ctx context.Context, message *pubsub.Message) {
 					d.cond.L.Lock()
 					// lock when we hit the limit
 					for atomic.LoadInt64(d.msgInFlight) >= int64(atomic.LoadInt32(d.msgInFlightLimit)) {
@@ -53,6 +53,10 @@ func (d *Driver) listen(ctx context.Context) {
 					d.cond.L.Unlock()
 					span.End()
 				})
+
+				if err != nil {
+					d.log.Error("subscribing error", zap.Error(err))
+				}
 			}
 		}
 	}()

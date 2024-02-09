@@ -161,13 +161,6 @@ func fromJob(job jobs.Message) *Item {
 		},
 	}
 }
-func bytesToStr(data []byte) string {
-	if len(data) == 0 {
-		return ""
-	}
-
-	return unsafe.String(unsafe.SliceData(data), len(data))
-}
 
 func strToBytes(data string) []byte {
 	if data == "" {
