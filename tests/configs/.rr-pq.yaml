@@ -31,15 +31,6 @@ jobs:
       driver: google-pub-sub
       config:
         prefetch: 1000
-        visibility_timeout: 0
-        wait_time_seconds: 0
-        queue: default-1-pq
-        attributes:
-          DelaySeconds: 0
-          MaximumMessageSize: 262144
-          MessageRetentionPeriod: 345600
-          ReceiveMessageWaitTimeSeconds: 0
-          VisibilityTimeout: 30
         tags:
           test: "tag-pq"
 
@@ -47,9 +38,6 @@ jobs:
       driver: google-pub-sub
       config:
         prefetch: 1000
-        queue: default-2-pq
-        attributes:
-          MessageRetentionPeriod: 86400
         tags:
           test: "tag"
   consume: [ "test-1-pq", "test-2-pq" ]
