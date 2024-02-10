@@ -23,7 +23,7 @@ type Item struct {
 	// Payload is string data (usually JSON) passed to Job broker.
 	Payload string `json:"payload"`
 	// Headers with key-values pairs
-	headers map[string][]string `json:"headers"`
+	Metadata map[string][]string `json:"headers"`
 	// Options contains set of PipelineOptions specific to job execution. Can be empty.
 	Options *Options `json:"options,omitempty"`
 }
@@ -71,7 +71,7 @@ func (i *Item) Body() []byte {
 }
 
 func (i *Item) Headers() map[string][]string {
-	return i.headers
+	return i.Metadata
 }
 
 // Context packs job context (job, id) into binary payload.
@@ -89,7 +89,7 @@ func (i *Item) Context() ([]byte, error) {
 			ID:       i.Ident,
 			Job:      i.Job,
 			Driver:   pluginName,
-			Headers:  i.headers,
+			Headers:  i.Metadata,
 			Queue:    i.Options.Queue,
 			Pipeline: i.Options.Pipeline,
 		},
@@ -152,7 +152,7 @@ func fromJob(job jobs.Message) *Item {
 		Job:     job.Name(),
 		Ident:   job.ID(),
 		Payload: string(job.Payload()),
-		headers: job.Headers(),
+		Metadata: job.Headers(),
 		Options: &Options{
 			Priority: job.Priority(),
 			Pipeline: job.GroupID(),
@@ -218,7 +218,7 @@ func (c *Driver) unpack(message *pubsub.Message) *Item {
 		Job:     rrj,
 		Ident:   rrid,
 		Payload: string(message.Data),
-		headers: h,
+		Metadata: h,
 		Options: &Options{
 			AutoAck:  autoAck,
 			Delay:    int64(dl),

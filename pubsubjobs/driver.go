@@ -190,7 +190,7 @@ func (d *Driver) Push(ctx context.Context, jb jobs.Message) error {
 
 	job := fromJob(jb)
 
-	data, err := json.Marshal(job.headers)
+	data, err := json.Marshal(job.Metadata)
 	if err != nil {
 		return err
 	}

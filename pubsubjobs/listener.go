@@ -28,7 +28,7 @@ func (d *Driver) listen(ctx context.Context) {
 					d.log.Debug("receive message", zap.Stringp("ID", &message.ID))
 					item := d.unpack(message)
 
-					ctxspan, span := d.tracer.Tracer(tracerName).Start(d.prop.Extract(context.Background(), propagation.HeaderCarrier(item.headers)), "google_pub_sub_listener")
+					ctxspan, span := d.tracer.Tracer(tracerName).Start(d.prop.Extract(context.Background(), propagation.HeaderCarrier(item.Metadata)), "google_pub_sub_listener")
 					if item.Options.AutoAck {
 						_, err := message.AckWithResult().Get(ctx)
 						if err != nil {
@@ -40,11 +40,11 @@ func (d *Driver) listen(ctx context.Context) {
 						d.log.Debug("auto ack is turned on, message acknowledged")
 					}
 
-					if item.headers == nil {
-						item.headers = make(map[string][]string, 2)
+					if item.Metadata == nil {
+						item.Metadata = make(map[string][]string, 2)
 					}
 
-					d.prop.Inject(ctxspan, propagation.HeaderCarrier(item.headers))
+					d.prop.Inject(ctxspan, propagation.HeaderCarrier(item.Metadata))
 
 					d.pq.Insert(item)
 					// increase the current number of messages
