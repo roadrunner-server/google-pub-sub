@@ -13,7 +13,7 @@ func (d *Driver) listen(ctx context.Context) {
 	go func() {
 		for {
 			select {
-			case <-d.pauseCh:
+			case <-d.stopCh:
 				d.log.Debug("listener was stopped")
 				return
 			default:
@@ -30,13 +30,7 @@ func (d *Driver) listen(ctx context.Context) {
 
 					ctxspan, span := d.tracer.Tracer(tracerName).Start(d.prop.Extract(context.Background(), propagation.HeaderCarrier(item.Metadata)), "google_pub_sub_listener")
 					if item.Options.AutoAck {
-						_, err := message.AckWithResult().Get(ctx)
-						if err != nil {
-							d.log.Error("message acknowledge", zap.Error(err))
-							span.RecordError(err)
-							span.End()
-							return
-						}
+						message.Ack()
 						d.log.Debug("auto ack is turned on, message acknowledged")
 					}
 

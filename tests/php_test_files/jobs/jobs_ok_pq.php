@@ -1,9 +1,4 @@
 <?php
-
-/**
- * @var Goridge\RelayInterface $relay
- */
-
 use Spiral\Goridge;
 use Spiral\RoadRunner;
 use Spiral\Goridge\StreamRelay;
@@ -17,7 +12,7 @@ $consumer = new Spiral\RoadRunner\Jobs\Consumer();
 
 while ($task = $consumer->waitTask()) {
     try {
-	sleep(15);
+	    sleep(15);
         $task->complete();
     } catch (\Throwable $e) {
         $rr->error((string)$e);

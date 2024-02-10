@@ -58,7 +58,7 @@ type Driver struct {
 	client *pubsub.Client
 
 	stopped uint64
-	pauseCh chan struct{}
+	stopCh  chan struct{}
 }
 
 // FromConfig initializes google_pub_sub_driver_ pipeline
@@ -103,7 +103,7 @@ func FromConfig(tracer *sdktrace.TracerProvider, configKey string, pipe jobs.Pip
 		skipDeclare:      conf.SkipTopicDeclaration,
 		topic:            conf.Topic,
 		pq:               pq,
-		pauseCh:          make(chan struct{}, 1),
+		stopCh:           make(chan struct{}, 2),
 		cond:             sync.Cond{L: &sync.Mutex{}},
 		msgInFlightLimit: ptr(conf.Prefetch),
 		msgInFlight:      ptr(int64(0)),
@@ -156,7 +156,7 @@ func FromPipeline(tracer *sdktrace.TracerProvider, pipe jobs.Pipeline, log *zap.
 		tracer:           tracer,
 		log:              log,
 		pq:               pq,
-		pauseCh:          make(chan struct{}, 1),
+		stopCh:           make(chan struct{}, 2),
 		skipDeclare:      pipe.Bool(skipTopicDeclaration, false),
 		topic:            pipe.String(topic, "default"),
 		cond:             sync.Cond{L: &sync.Mutex{}},
@@ -184,9 +184,16 @@ func FromPipeline(tracer *sdktrace.TracerProvider, pipe jobs.Pipeline, log *zap.
 }
 
 func (d *Driver) Push(ctx context.Context, jb jobs.Message) error {
+	const op = errors.Op("google_pub_sub_push")
 	// check if the pipeline registered
 	ctx, span := trace.SpanFromContext(ctx).TracerProvider().Tracer(tracerName).Start(ctx, "google_pub_sub_push")
 	defer span.End()
+
+	// load atomic value
+	pipe := *d.pipeline.Load()
+	if pipe.Name() != jb.GroupID() {
+		return errors.E(op, errors.Errorf("no such pipeline: %s, actual: %s", jb.GroupID(), pipe.Name()))
+	}
 
 	job := fromJob(jb)
 
@@ -274,7 +281,7 @@ func (d *Driver) Pause(ctx context.Context, p string) error {
 	}
 
 	// stop consume
-	d.pauseCh <- struct{}{}
+	d.stopCh <- struct{}{}
 	// if blocked, let 1 item to pass to unblock the listener and close the pipe
 	d.cond.Signal()
 
@@ -333,7 +340,7 @@ func (d *Driver) Stop(ctx context.Context) error {
 		// if blocked, let 1 item to pass to unblock the listener and close the pipe
 		d.cond.Signal()
 
-		d.pauseCh <- struct{}{}
+		d.stopCh <- struct{}{}
 	}
 
 	d.log.Debug("pipeline was stopped", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", time.Now().UTC()), zap.Duration("elapsed", time.Since(start)))
@@ -357,8 +364,8 @@ func (d *Driver) manageTopic(ctx context.Context) error {
 	}
 
 	_, err = d.client.CreateSubscription(ctx, d.sub, pubsub.SubscriptionConfig{
-		Topic:                     topic,
-		AckDeadline:               30 * time.Second,
+		Topic:       topic,
+		AckDeadline: 10 * time.Minute,
 	})
 	if err != nil {
 		if !strings.Contains(err.Error(), "Subscription already exists") {
