@@ -65,9 +65,6 @@ jobs:
         env:
           RR_TEST_ENV: ${{ secrets.RR_TEST_ENV }}
           RR_GOOGLE_PUB_SUB_TEST_ENDPOINT: ${{ secrets.RR_GOOGLE_PUB_SUB__TEST_ENDPOINT }}
-          RR_GOOGLE_PUB_SUB__TEST_REGION: ${{ secrets.RR_GOOGLE_PUB_SUB__TEST_REGION }}
-          RR_GOOGLE_PUB_SUB__TEST_KEY: ${{ secrets.RR_GOOGLE_PUB_SUB__TEST_KEY }}
-          RR_GOOGLE_PUB_SUB__TEST_SECRET: ${{ secrets.RR_GOOGLE_PUB_SUB__TEST_SECRET }}
         run: |
           cd tests
           mkdir ./coverage-ci
