@@ -1,0 +1,43 @@
+version: '3'
+
+rpc:
+  listen: tcp://127.0.0.1:6601
+
+server:
+  command: "php php_test_files/jobs/jobs_ok_pq.php"
+  relay: "pipes"
+
+google-pub-sub:
+  project_id: test
+  topic: rrTopic
+  skip_topic_declaration: false
+  host: 127.0.0.1:8085
+
+logs:
+  level: debug
+  encoding: console
+  mode: development
+
+jobs:
+  num_pollers: 2
+  pipeline_size: 100000
+  pool:
+    num_workers: 2
+    allocate_timeout: 60s
+    destroy_timeout: 60s
+
+  pipelines:
+    test-1-pq:
+      driver: google-pub-sub
+      config:
+        prefetch: 1000
+        tags:
+          test: "tag-pq"
+
+    test-2-pq:
+      driver: google-pub-sub
+      config:
+        prefetch: 1000
+        tags:
+          test: "tag"
+  consume: [ "test-1-pq", "test-2-pq" ]

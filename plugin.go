@@ -1,8 +1,7 @@
 package google_pub_sub
 
 import (
-	"github.com/roadrunner-server/api/v4/plugins/v1/jobs"
-	pq "github.com/roadrunner-server/api/v4/plugins/v1/priority_queue"
+	"github.com/roadrunner-server/api/v4/plugins/v3/jobs"
 	"github.com/roadrunner-server/endure/v2/dep"
 	"github.com/roadrunner-server/errors"
 	"github.com/roadrunner-server/google-pub-sub/v4/pubsubjobs"
@@ -10,7 +9,10 @@ import (
 	"go.uber.org/zap"
 )
 
-const pluginName string = "google-pub-sub"
+const (
+	pluginName       string = "google-pub-sub"
+	masterPluginName string = "jobs"
+)
 
 type Plugin struct {
 	log    *zap.Logger
@@ -34,7 +36,7 @@ type Tracer interface {
 }
 
 func (p *Plugin) Init(log Logger, cfg Configurer) error {
-	if !cfg.Has(pluginName) {
+	if !cfg.Has(pluginName) && !cfg.Has(masterPluginName) {
 		return errors.E(errors.Disabled)
 	}
 
@@ -56,12 +58,10 @@ func (p *Plugin) Collects() []*dep.In {
 	}
 }
 
-// DriverFromConfig constructs kafka driver from the .rr.yaml configuration
-func (p *Plugin) DriverFromConfig(configKey string, pq pq.Queue, pipeline jobs.Pipeline, _ chan<- jobs.Commander) (jobs.Driver, error) {
-	return pubsubjobs.FromConfig(p.tracer, configKey, p.log, p.cfg, pipeline, pq)
+func (p *Plugin) DriverFromConfig(configKey string, pq jobs.Queue, pipeline jobs.Pipeline, _ chan<- jobs.Commander) (jobs.Driver, error) {
+	return pubsubjobs.FromConfig(p.tracer, configKey, pipeline, p.log, p.cfg, pq)
 }
 
-// DriverFromPipeline constructs kafka driver from pipeline
-func (p *Plugin) DriverFromPipeline(pipe jobs.Pipeline, pq pq.Queue, _ chan<- jobs.Commander) (jobs.Driver, error) {
+func (p *Plugin) DriverFromPipeline(pipe jobs.Pipeline, pq jobs.Queue, _ chan<- jobs.Commander) (jobs.Driver, error) {
 	return pubsubjobs.FromPipeline(p.tracer, pipe, p.log, p.cfg, pq)
 }
