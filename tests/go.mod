@@ -1,6 +1,6 @@
 module tests
 
-go 1.22.2
+go 1.22.3
 
 replace github.com/roadrunner-server/google-pub-sub/v4 => ../
 
