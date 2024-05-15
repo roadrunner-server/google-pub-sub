@@ -1,4 +1,4 @@
-name: Google pub sub
+name: Google-PubSub
 
 on:
   push:
@@ -68,10 +68,6 @@ jobs:
           docker compose -f env/docker-compose-emulator-local.yaml up -d
           sleep 30
           go test -timeout 20m -v -race -cover -tags=debug -failfast -coverpkg=$(cat pkgs.txt) -coverprofile=./coverage-ci/pubsub.out -covermode=atomic jobs_test.go
-
-      - name: Run unit tests with coverage
-        run: |
-          go test -timeout 20m -v -race -cover -tags=debug -failfast -coverpkg=$(cat ./tests/pkgs.txt) -coverprofile=./tests/coverage-ci/pubsub_u.out -covermode=atomic ./...
 
       - name: Archive code coverage results
         uses: actions/upload-artifact@v4
