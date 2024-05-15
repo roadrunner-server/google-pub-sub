@@ -22,7 +22,7 @@ type config struct {
 	Host     string `mapstructure:"host"`
 }
 
-func (c *config) InitDefault() {
+func (c *config) InitDefaults() error {
 	if c.Prefetch == 0 {
 		c.Prefetch = 10
 	}
@@ -33,6 +33,11 @@ func (c *config) InitDefault() {
 
 	if c.Host != "" {
 		// No possibility to set up emulator from client init
-		os.Setenv("PUBSUB_EMULATOR_HOST", c.Host)
+		err := os.Setenv("PUBSUB_EMULATOR_HOST", c.Host)
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
 }

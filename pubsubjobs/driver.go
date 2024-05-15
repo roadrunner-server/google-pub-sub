@@ -35,8 +35,7 @@ type Configurer interface {
 }
 
 type Driver struct {
-	mu   sync.Mutex
-	cond sync.Cond
+	mu sync.Mutex
 
 	log              *zap.Logger
 	pq               jobs.Queue
@@ -93,7 +92,10 @@ func FromConfig(tracer *sdktrace.TracerProvider, configKey string, pipe jobs.Pip
 		return nil, errors.E(op, err)
 	}
 
-	conf.InitDefault()
+	err = conf.InitDefaults()
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
 	// PARSE CONFIGURATION END -------
 
 	jb := &Driver{
@@ -104,7 +106,6 @@ func FromConfig(tracer *sdktrace.TracerProvider, configKey string, pipe jobs.Pip
 		topic:            conf.Topic,
 		pq:               pq,
 		stopCh:           make(chan struct{}, 2),
-		cond:             sync.Cond{L: &sync.Mutex{}},
 		msgInFlightLimit: ptr(conf.Prefetch),
 		msgInFlight:      ptr(int64(0)),
 		sub:              pipe.Name(),
@@ -148,8 +149,13 @@ func FromPipeline(tracer *sdktrace.TracerProvider, pipe jobs.Pipeline, log *zap.
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	conf.InitDefault()
-	// PARSE CONFIGURATION -------
+
+	err = conf.InitDefaults()
+	if err != nil {
+		return nil, err
+	}
+
+	// PARSE CONFIGURATION END -------
 
 	jb := &Driver{
 		prop:             prop,
@@ -159,7 +165,6 @@ func FromPipeline(tracer *sdktrace.TracerProvider, pipe jobs.Pipeline, log *zap.
 		stopCh:           make(chan struct{}, 2),
 		skipDeclare:      pipe.Bool(skipTopicDeclaration, false),
 		topic:            pipe.String(topic, "default"),
-		cond:             sync.Cond{L: &sync.Mutex{}},
 		msgInFlightLimit: ptr(int32(pipe.Int(pref, 10))),
 		msgInFlight:      ptr(int64(0)),
 		sub:              pipe.Name(),
@@ -282,8 +287,6 @@ func (d *Driver) Pause(ctx context.Context, p string) error {
 
 	// stop consume
 	d.stopCh <- struct{}{}
-	// if blocked, let 1 item to pass to unblock the listener and close the pipe
-	d.cond.Signal()
 
 	d.log.Debug("pipeline was paused", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", time.Now().UTC()), zap.Duration("elapsed", time.Since(start)))
 
@@ -337,8 +340,6 @@ func (d *Driver) Stop(ctx context.Context) error {
 		if d.cancel != nil {
 			d.cancel()
 		}
-		// if blocked, let 1 item to pass to unblock the listener and close the pipe
-		d.cond.Signal()
 
 		d.stopCh <- struct{}{}
 	}
