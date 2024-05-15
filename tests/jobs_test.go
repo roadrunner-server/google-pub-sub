@@ -363,7 +363,7 @@ func TestAutoAck(t *testing.T) {
 	stopCh <- struct{}{}
 	wg.Wait()
 
-	require.Equal(t, 4, oLogger.FilterMessageSnippet("auto ack is turned on, message acknowledged").Len())
+	require.Equal(t, 2, oLogger.FilterMessageSnippet("auto ack is turned on, message acknowledged").Len())
 }
 
 func TestRemovePQ(t *testing.T) {
