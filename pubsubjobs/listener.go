@@ -49,7 +49,6 @@ func (d *Driver) listen() {
 
 			d.log.Error("subscribing error", zap.Error(err))
 		}
-
 	}()
 }
 
