@@ -62,9 +62,6 @@ jobs:
         run: go mod download
 
       - name: Run tests with coverage
-        env:
-          RR_TEST_ENV: ${{ secrets.RR_TEST_ENV }}
-          RR_GOOGLE_PUB_SUB_TEST_ENDPOINT: ${{ secrets.RR_GOOGLE_PUB_SUB__TEST_ENDPOINT }}
         run: |
           cd tests
           mkdir ./coverage-ci
