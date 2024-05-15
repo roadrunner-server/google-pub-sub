@@ -1,4 +1,4 @@
-package google_pub_sub
+package googlepubsub
 
 import (
 	"github.com/roadrunner-server/api/v4/plugins/v3/jobs"
@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	pluginName       string = "google-pub-sub"
+	pluginName       string = "google_pub_sub"
 	masterPluginName string = "jobs"
 )
 

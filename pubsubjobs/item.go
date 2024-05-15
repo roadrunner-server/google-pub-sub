@@ -2,7 +2,6 @@ package pubsubjobs
 
 import (
 	"strconv"
-	"sync"
 	"sync/atomic"
 	"time"
 	"unsafe"
@@ -42,10 +41,8 @@ type Options struct {
 	// AMQP Queue
 	Queue string `json:"queue,omitempty"`
 	// Private ================
-	cond        *sync.Cond
-	message     *pubsub.Message
-	msgInFlight *int64
-	stopped     *uint64
+	message *pubsub.Message
+	stopped *uint64
 }
 
 // DelayDuration returns delay duration in a form of time.Duration.
@@ -106,10 +103,6 @@ func (i *Item) Ack() error {
 	if atomic.LoadUint64(i.Options.stopped) == 1 {
 		return errors.Str("failed to acknowledge the JOB, the pipeline is probably stopped")
 	}
-	defer func() {
-		i.Options.cond.Signal()
-		atomic.AddInt64(i.Options.msgInFlight, ^int64(0))
-	}()
 	// just return in case of auto-ack
 	if i.Options.AutoAck {
 		return nil
@@ -123,11 +116,7 @@ func (i *Item) Nack() error {
 	if atomic.LoadUint64(i.Options.stopped) == 1 {
 		return errors.Str("failed to acknowledge the JOB, the pipeline is probably stopped")
 	}
-	defer func() {
-		i.Options.cond.Signal()
-		atomic.AddInt64(i.Options.msgInFlight, ^int64(0))
-	}()
-	
+
 	// message already deleted
 	if i.Options.AutoAck {
 		return nil
@@ -139,7 +128,7 @@ func (i *Item) Nack() error {
 }
 
 // Requeue with the provided delay, handled by the Nack
-func (i *Item) Requeue(headers map[string][]string, delay int64) error {
+func (i *Item) Requeue(map[string][]string, int64) error {
 	return nil
 }
 
@@ -149,9 +138,9 @@ func (i *Item) Respond(_ []byte, _ string) error {
 
 func fromJob(job jobs.Message) *Item {
 	return &Item{
-		Job:     job.Name(),
-		Ident:   job.ID(),
-		Payload: string(job.Payload()),
+		Job:      job.Name(),
+		Ident:    job.ID(),
+		Payload:  string(job.Payload()),
 		Metadata: job.Headers(),
 		Options: &Options{
 			Priority: job.Priority(),
@@ -170,7 +159,7 @@ func strToBytes(data string) []byte {
 	return unsafe.Slice(unsafe.StringData(data), len(data))
 }
 
-func (c *Driver) unpack(message *pubsub.Message) *Item {
+func (d *Driver) unpack(message *pubsub.Message) *Item {
 	attributes := message.Attributes
 
 	var rrid string
@@ -187,7 +176,7 @@ func (c *Driver) unpack(message *pubsub.Message) *Item {
 	if val, ok := attributes[jobs.RRHeaders]; ok {
 		err := json.Unmarshal([]byte(val), &h)
 		if err != nil {
-			c.log.Debug("failed to unpack the headers, not a JSON", zap.Error(err))
+			d.log.Debug("failed to unpack the headers, not a JSON", zap.Error(err))
 		}
 	}
 
@@ -201,7 +190,7 @@ func (c *Driver) unpack(message *pubsub.Message) *Item {
 	if val, ok := attributes[jobs.RRDelay]; ok {
 		dl, err = strconv.Atoi(val)
 		if err != nil {
-			c.log.Debug("failed to unpack the delay, not a number", zap.Error(err))
+			d.log.Debug("failed to unpack the delay, not a number", zap.Error(err))
 		}
 	}
 
@@ -209,26 +198,24 @@ func (c *Driver) unpack(message *pubsub.Message) *Item {
 	if val, ok := attributes[jobs.RRPriority]; ok {
 		priority, err = strconv.Atoi(val)
 		if err != nil {
-			priority = int((*c.pipeline.Load()).Priority())
-			c.log.Debug("failed to unpack the priority; inheriting the pipeline's default priority", zap.Error(err))
+			priority = int((*d.pipeline.Load()).Priority())
+			d.log.Debug("failed to unpack the priority; inheriting the pipeline's default priority", zap.Error(err))
 		}
 	}
 
 	return &Item{
-		Job:     rrj,
-		Ident:   rrid,
-		Payload: string(message.Data),
+		Job:      rrj,
+		Ident:    rrid,
+		Payload:  string(message.Data),
 		Metadata: h,
 		Options: &Options{
 			AutoAck:  autoAck,
 			Delay:    int64(dl),
 			Priority: int64(priority),
-			Pipeline: (*c.pipeline.Load()).Name(),
+			Pipeline: (*d.pipeline.Load()).Name(),
 			// private
-			message:     message,
-			msgInFlight: c.msgInFlight,
-			cond:        &c.cond,
-			stopped:     &c.stopped,
+			message: message,
+			stopped: &d.stopped,
 		},
 	}
 }

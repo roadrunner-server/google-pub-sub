@@ -4,7 +4,6 @@ import (
 	"context"
 	"net"
 	"net/rpc"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +15,9 @@ import (
 	goridgeRpc "github.com/roadrunner-server/goridge/v3/pkg/rpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/api/option"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 const (
@@ -55,30 +57,6 @@ func PushToPipe(pipeline string, autoAck bool, address string) func(t *testing.T
 		er := &jobsProto.Empty{}
 		err = client.Call(push, req, er)
 		require.NoError(t, err)
-	}
-}
-
-func PushToPipeDelayed(address string, pipeline string, delay int64) func(t *testing.T) {
-	return func(t *testing.T) {
-		conn, err := net.Dial("tcp", address)
-		assert.NoError(t, err)
-		client := rpc.NewClientWithCodec(goridgeRpc.NewClientCodec(conn))
-
-		req := &jobsProto.PushRequest{Job: &jobsProto.Job{
-			Job:     "some/php/namespace",
-			Id:      uuid.NewString(),
-			Payload: []byte(`{"hello":"world"}`),
-			Headers: map[string]*jobsProto.HeaderValue{"test": {Value: []string{"test2"}}},
-			Options: &jobsProto.Options{
-				Priority: 1,
-				Pipeline: pipeline,
-				Delay:    delay,
-			},
-		}}
-
-		er := &jobsProto.Empty{}
-		err = client.Call(push, req, er)
-		assert.NoError(t, err)
 	}
 }
 
@@ -164,21 +142,20 @@ func Stats(address string, state *jobState.State) func(t *testing.T) {
 	}
 }
 
-func DeclarePipe(queue string, address string, pipeline string) func(t *testing.T) {
+func DeclarePipe(topic string, address string, pipeline string) func(t *testing.T) {
 	return func(t *testing.T) {
 		conn, err := net.Dial("tcp", address)
 		assert.NoError(t, err)
 		client := rpc.NewClientWithCodec(goridgeRpc.NewClientCodec(conn))
 
 		pipe := &jobsProto.DeclareRequest{Pipeline: map[string]string{
-			"driver":             "google-pub-sub",
-			"name":               pipeline,
-			"queue":              queue,
-			"prefetch":           "10",
-			"priority":           "3",
-			"visibility_timeout": "0",
-			"wait_time_seconds":  "3",
-			"tags":               `{"key":"value"}`,
+			"driver":                 "google_pub_sub",
+			"name":                   pipeline,
+			"priority":               "3",
+			"topic":                  topic,
+			"skip_topic_declaration": "false",
+			"project_id":             "test",
+			"tags":                   `{"key":"value"}`,
 		}}
 
 		er := &jobsProto.Empty{}
@@ -188,9 +165,12 @@ func DeclarePipe(queue string, address string, pipeline string) func(t *testing.
 }
 
 func CleanEmulator() error {
-	os.Setenv("PUBSUB_EMULATOR_HOST", "127.0.0.1:8085")
 	ctx := context.Background()
-	client, err := pubsub.NewClient(ctx, "test")
+	client, err := pubsub.NewClient(ctx, "test",
+		option.WithoutAuthentication(),
+		option.WithTelemetryDisabled(),
+		option.WithEndpoint("127.0.0.1:8085"),
+		option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())))
 	if err != nil {
 		return err
 	}
@@ -199,12 +179,12 @@ func CleanEmulator() error {
 		sub, err := client.Subscriptions(ctx).Next()
 		if err != nil {
 			if strings.Contains(err.Error(), "no more items in iterator") {
-				break;
+				break
 			}
 
 			return err
 		}
-		
+
 		err = sub.Delete(ctx)
 		if err != nil {
 			return err

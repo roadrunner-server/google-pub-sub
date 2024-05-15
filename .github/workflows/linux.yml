@@ -1,4 +1,4 @@
-name: Google pub sub
+name: Google-PubSub
 
 on:
   push:
@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        php: [ "8.2" ]
+        php: [ "8.3" ]
         go: [ stable ]
         os: [ "ubuntu-latest" ]
     steps:
@@ -62,19 +62,12 @@ jobs:
         run: go mod download
 
       - name: Run tests with coverage
-        env:
-          RR_TEST_ENV: ${{ secrets.RR_TEST_ENV }}
-          RR_GOOGLE_PUB_SUB_TEST_ENDPOINT: ${{ secrets.RR_GOOGLE_PUB_SUB__TEST_ENDPOINT }}
         run: |
           cd tests
           mkdir ./coverage-ci
           docker compose -f env/docker-compose-emulator-local.yaml up -d
           sleep 30
           go test -timeout 20m -v -race -cover -tags=debug -failfast -coverpkg=$(cat pkgs.txt) -coverprofile=./coverage-ci/pubsub.out -covermode=atomic jobs_test.go
-
-      - name: Run unit tests with coverage
-        run: |
-          go test -timeout 20m -v -race -cover -tags=debug -failfast -coverpkg=$(cat ./tests/pkgs.txt) -coverprofile=./tests/coverage-ci/pubsub_u.out -covermode=atomic ./...
 
       - name: Archive code coverage results
         uses: actions/upload-artifact@v4

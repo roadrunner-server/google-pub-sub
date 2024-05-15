@@ -14,5 +14,6 @@
 # Dependency directories (remove the comment below to include it)
 **/vendor/
 vendor/
+tests/php_test_files/composer.lock
 .idea
 .DS_Store
