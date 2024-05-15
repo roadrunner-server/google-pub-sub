@@ -8,10 +8,8 @@ server:
   relay: "pipes"
   relay_timeout: "20s"
 
-google-pub-sub:
-  project_id: test
-  topic: rrTopic
-  skip_topic_declaration: false
+google_pub_sub:
+  insecure: true
   host: 127.0.0.1:8085
 
 logs:
@@ -30,15 +28,20 @@ jobs:
 
   pipelines:
     test-1:
-      driver: google-pub-sub
+      driver: google_pub_sub
       config:
-        prefetch: 1000
+        project_id: test
+        topic: rrTopic1
+        skip_topic_declaration: false
         tags:
           test: "tag"
 
     test-2:
-      driver: google-pub-sub
+      driver: google_pub_sub
       config:
+        project_id: test
+        topic: rrTopic2
+        skip_topic_declaration: false
         tags:
           test: "tag"
   consume: [ "test-1", "test-2" ]

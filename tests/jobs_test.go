@@ -181,7 +181,7 @@ func TestDeclare(t *testing.T) {
 
 	time.Sleep(time.Second * 3)
 
-	t.Run("DeclarePipeline", helpers.DeclarePipe("default", "127.0.0.1:6001", "test-3"))
+	t.Run("DeclarePipeline", helpers.DeclarePipe("rr1", "127.0.0.1:6001", "test-3"))
 	t.Run("ConsumePipeline", helpers.ResumePipes("127.0.0.1:6001", "test-3"))
 	t.Run("PushPipeline", helpers.PushToPipe("test-3", false, "127.0.0.1:6001"))
 	time.Sleep(time.Second)
@@ -267,7 +267,7 @@ func TestJobsError(t *testing.T) {
 
 	time.Sleep(time.Second * 3)
 
-	t.Run("DeclarePipeline", helpers.DeclarePipe("default", "127.0.0.1:6001", "test-3"))
+	t.Run("DeclarePipeline", helpers.DeclarePipe("rr2", "127.0.0.1:6001", "test-3"))
 	t.Run("ConsumePipeline", helpers.ResumePipes("127.0.0.1:6001", "test-3"))
 	t.Run("PushPipeline", helpers.PushToPipe("test-3", false, "127.0.0.1:6001"))
 	time.Sleep(time.Second * 25)
@@ -375,7 +375,7 @@ func TestRemovePQ(t *testing.T) {
 	cont := endure.New(slog.LevelDebug)
 
 	cfg := &config.Plugin{
-		Version: "2023.2.0",
+		Version: "2024.1.0",
 		Path:    "configs/.rr-pq.yaml",
 		Prefix:  "rr",
 	}
@@ -441,15 +441,16 @@ func TestRemovePQ(t *testing.T) {
 	time.Sleep(time.Second * 3)
 
 	for i := 0; i < 10; i++ {
-		t.Run("PushPipeline", helpers.PushToPipe("test-1-pq", false, "127.0.0.1:6601"))
-		t.Run("PushPipeline", helpers.PushToPipe("test-2-pq", false, "127.0.0.1:6601"))
+		t.Run("PushPipeline", helpers.PushToPipe("test-3", false, "127.0.0.1:6601"))
+		t.Run("PushPipeline", helpers.PushToPipe("test-4", false, "127.0.0.1:6601"))
 	}
 	time.Sleep(time.Second * 3)
 
-	t.Run("DestroyPipeline", helpers.DestroyPipelines("127.0.0.1:6601", "test-1-pq", "test-2-pq"))
+	t.Run("DestroyPipeline", helpers.DestroyPipelines("127.0.0.1:6601", "test-3", "test-4"))
 
 	stopCh <- struct{}{}
 	wg.Wait()
+	time.Sleep(time.Second * 5)
 
 	assert.Equal(t, 0, oLogger.FilterMessageSnippet("job was processed successfully").Len())
 	assert.Equal(t, 2, oLogger.FilterMessageSnippet("pipeline was started").Len())

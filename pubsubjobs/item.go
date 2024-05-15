@@ -41,9 +41,8 @@ type Options struct {
 	// AMQP Queue
 	Queue string `json:"queue,omitempty"`
 	// Private ================
-	message     *pubsub.Message
-	msgInFlight *int64
-	stopped     *uint64
+	message *pubsub.Message
+	stopped *uint64
 }
 
 // DelayDuration returns delay duration in a form of time.Duration.
@@ -104,9 +103,6 @@ func (i *Item) Ack() error {
 	if atomic.LoadUint64(i.Options.stopped) == 1 {
 		return errors.Str("failed to acknowledge the JOB, the pipeline is probably stopped")
 	}
-	defer func() {
-		atomic.AddInt64(i.Options.msgInFlight, ^int64(0))
-	}()
 	// just return in case of auto-ack
 	if i.Options.AutoAck {
 		return nil
@@ -120,9 +116,6 @@ func (i *Item) Nack() error {
 	if atomic.LoadUint64(i.Options.stopped) == 1 {
 		return errors.Str("failed to acknowledge the JOB, the pipeline is probably stopped")
 	}
-	defer func() {
-		atomic.AddInt64(i.Options.msgInFlight, ^int64(0))
-	}()
 
 	// message already deleted
 	if i.Options.AutoAck {
@@ -221,9 +214,8 @@ func (d *Driver) unpack(message *pubsub.Message) *Item {
 			Priority: int64(priority),
 			Pipeline: (*d.pipeline.Load()).Name(),
 			// private
-			message:     message,
-			msgInFlight: d.msgInFlight,
-			stopped:     &d.stopped,
+			message: message,
+			stopped: &d.stopped,
 		},
 	}
 }

@@ -18,10 +18,13 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
+	"google.golang.org/api/option"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 const (
-	pluginName string = "google-pub-sub"
+	pluginName string = "google_pub_sub"
 	tracerName string = "jobs"
 )
 
@@ -37,27 +40,26 @@ type Configurer interface {
 type Driver struct {
 	mu sync.Mutex
 
-	log              *zap.Logger
-	pq               jobs.Queue
-	pipeline         atomic.Pointer[jobs.Pipeline]
-	tracer           *sdktrace.TracerProvider
-	prop             propagation.TextMapPropagator
-	skipDeclare      bool
-	topic            string
-	msgInFlight      *int64
-	msgInFlightLimit *int32
-	sub              string
+	log         *zap.Logger
+	pq          jobs.Queue
+	pipeline    atomic.Pointer[jobs.Pipeline]
+	tracer      *sdktrace.TracerProvider
+	prop        propagation.TextMapPropagator
+	skipDeclare bool
+	topic       string
+	sub         string
+	// pubsub specific
+	gsub    *pubsub.Subscription
+	gtopic  *pubsub.Topic
+	gclient *pubsub.Client
+
+	// context cancel func used to cancel the pubsub subscription
+	receiveCtxCancel context.CancelFunc
+	rctx             context.Context
 
 	// if user invoke several resume operations
 	listeners uint32
-
-	// func to cancel listener
-	cancel context.CancelFunc
-
-	client *pubsub.Client
-
-	stopped uint64
-	stopCh  chan struct{}
+	stopped   uint64
 }
 
 // FromConfig initializes google_pub_sub_driver_ pipeline
@@ -98,32 +100,37 @@ func FromConfig(tracer *sdktrace.TracerProvider, configKey string, pipe jobs.Pip
 	}
 	// PARSE CONFIGURATION END -------
 
-	jb := &Driver{
-		tracer:           tracer,
-		prop:             prop,
-		log:              log,
-		skipDeclare:      conf.SkipTopicDeclaration,
-		topic:            conf.Topic,
-		pq:               pq,
-		stopCh:           make(chan struct{}, 2),
-		msgInFlightLimit: ptr(conf.Prefetch),
-		msgInFlight:      ptr(int64(0)),
-		sub:              pipe.Name(),
+	var opts []option.ClientOption
+	if conf.Insecure {
+		opts = append(opts, option.WithoutAuthentication())
+		opts = append(opts, option.WithTelemetryDisabled())
+		opts = append(opts, option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())))
 	}
 
-	ctx := context.Background()
-	jb.client, err = pubsub.NewClient(ctx, conf.ProjectID)
+	opts = append(opts, option.WithEndpoint(conf.Endpoint))
+
+	gclient, err := pubsub.NewClient(context.Background(), conf.ProjectID, opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	err = jb.manageTopic(ctx)
+	jb := &Driver{
+		tracer:      tracer,
+		prop:        prop,
+		log:         log,
+		skipDeclare: conf.SkipTopicDeclaration,
+		topic:       conf.Topic,
+		pq:          pq,
+		sub:         pipe.Name(),
+		gclient:     gclient,
+	}
+
+	err = jb.manageTopic()
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
 
 	jb.pipeline.Store(&pipe)
-	time.Sleep(time.Second)
 
 	return jb, nil
 }
@@ -150,40 +157,48 @@ func FromPipeline(tracer *sdktrace.TracerProvider, pipe jobs.Pipeline, log *zap.
 		return nil, errors.E(op, err)
 	}
 
+	conf.ProjectID = pipe.String(projectIDKey, "")
+	conf.Topic = pipe.String(topicKey, "")
+	conf.SkipTopicDeclaration = pipe.Bool(skipTopicKey, false)
+
 	err = conf.InitDefaults()
 	if err != nil {
 		return nil, err
 	}
 
-	// PARSE CONFIGURATION END -------
-
-	jb := &Driver{
-		prop:             prop,
-		tracer:           tracer,
-		log:              log,
-		pq:               pq,
-		stopCh:           make(chan struct{}, 2),
-		skipDeclare:      pipe.Bool(skipTopicDeclaration, false),
-		topic:            pipe.String(topic, "default"),
-		msgInFlightLimit: ptr(int32(pipe.Int(pref, 10))),
-		msgInFlight:      ptr(int64(0)),
-		sub:              pipe.Name(),
+	var opts []option.ClientOption
+	if conf.Insecure {
+		opts = append(opts, option.WithoutAuthentication())
+		opts = append(opts, option.WithTelemetryDisabled())
+		opts = append(opts, option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())))
 	}
 
-	ctx := context.Background()
-	jb.client, err = pubsub.NewClient(ctx, conf.ProjectID)
+	opts = append(opts, option.WithEndpoint(conf.Endpoint))
+
+	// PARSE CONFIGURATION END -------
+	gclient, err := pubsub.NewClient(context.Background(), conf.ProjectID, opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	err = jb.manageTopic(context.Background())
+	jb := &Driver{
+		prop:        prop,
+		tracer:      tracer,
+		log:         log,
+		pq:          pq,
+		skipDeclare: conf.SkipTopicDeclaration,
+		topic:       conf.Topic,
+		sub:         pipe.Name(),
+		gclient:     gclient,
+	}
+
+	err = jb.manageTopic()
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
 
 	// register the pipeline
 	jb.pipeline.Store(&pipe)
-	time.Sleep(time.Second)
 
 	return jb, nil
 }
@@ -207,7 +222,7 @@ func (d *Driver) Push(ctx context.Context, jb jobs.Message) error {
 		return err
 	}
 
-	result := d.client.Topic(d.topic).Publish(ctx, &pubsub.Message{
+	result := d.gtopic.Publish(ctx, &pubsub.Message{
 		Data: jb.Payload(),
 		Attributes: map[string]string{
 			jobs.RRID:       job.Ident,
@@ -217,7 +232,9 @@ func (d *Driver) Push(ctx context.Context, jb jobs.Message) error {
 			jobs.RRPriority: strconv.Itoa(int(job.Options.Priority)),
 			jobs.RRAutoAck:  btos(job.Options.AutoAck),
 		},
+		PublishTime: time.Now().UTC(),
 	})
+
 	id, err := result.Get(ctx)
 	if err != nil {
 		return err
@@ -229,8 +246,8 @@ func (d *Driver) Push(ctx context.Context, jb jobs.Message) error {
 }
 
 func (d *Driver) Run(ctx context.Context, p jobs.Pipeline) error {
-	start := time.Now().UTC()
 	const op = errors.Op("google_pub_sub_driver_run")
+	start := time.Now().UTC()
 
 	_, span := trace.SpanFromContext(ctx).TracerProvider().Tracer(tracerName).Start(ctx, "google_pub_sub_run")
 	defer span.End()
@@ -245,10 +262,7 @@ func (d *Driver) Run(ctx context.Context, p jobs.Pipeline) error {
 
 	atomic.AddUint32(&d.listeners, 1)
 
-	// start listener
-	var ctxCancel context.Context
-	ctxCancel, d.cancel = context.WithCancel(context.Background())
-	d.listen(ctxCancel)
+	d.listen()
 
 	d.log.Debug("pipeline was started", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
 	return nil
@@ -279,14 +293,10 @@ func (d *Driver) Pause(ctx context.Context, p string) error {
 		return errors.Str("no active listeners, nothing to pause")
 	}
 
+	// stop the listener
+	d.gtopic.Stop()
+
 	atomic.AddUint32(&d.listeners, ^uint32(0))
-
-	if d.cancel != nil {
-		d.cancel()
-	}
-
-	// stop consume
-	d.stopCh <- struct{}{}
 
 	d.log.Debug("pipeline was paused", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", time.Now().UTC()), zap.Duration("elapsed", time.Since(start)))
 
@@ -309,15 +319,12 @@ func (d *Driver) Resume(ctx context.Context, p string) error {
 	}
 
 	l := atomic.LoadUint32(&d.listeners)
-	// no active listeners
+	// we have an active listener
 	if l == 1 {
 		return errors.Str("listener is already in the active state")
 	}
 
-	// start listener
-	var ctxCancel context.Context
-	ctxCancel, d.cancel = context.WithCancel(context.Background())
-	d.listen(ctxCancel)
+	d.listen()
 
 	// increase num of listeners
 	atomic.AddUint32(&d.listeners, 1)
@@ -332,40 +339,46 @@ func (d *Driver) Stop(ctx context.Context) error {
 	_, span := trace.SpanFromContext(ctx).TracerProvider().Tracer(tracerName).Start(ctx, "google_pub_sub_stop")
 	defer span.End()
 
-	atomic.StoreUint64(&d.stopped, 1)
 	pipe := *d.pipeline.Load()
 	_ = d.pq.Remove(pipe.Name())
 
-	if atomic.LoadUint32(&d.listeners) > 0 {
-		if d.cancel != nil {
-			d.cancel()
-		}
+	d.checkCtxAndCancel()
 
-		d.stopCh <- struct{}{}
+	atomic.StoreUint64(&d.stopped, 1)
+	d.gtopic.Stop()
+
+	err := d.gclient.Close()
+	if err != nil {
+		d.log.Error("failed to close the client", zap.Error(err))
 	}
 
 	d.log.Debug("pipeline was stopped", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", time.Now().UTC()), zap.Duration("elapsed", time.Since(start)))
 	return nil
 }
 
-func (d *Driver) manageTopic(ctx context.Context) error {
+func (d *Driver) manageTopic() error {
 	if d.skipDeclare {
 		return nil
 	}
 
-	topic, err := d.client.CreateTopic(ctx, d.topic)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	var err error
+	d.gtopic, err = d.gclient.CreateTopic(ctx, d.topic)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Topic already exists") {
 			return err
 		}
 
-		topic = d.client.Topic(d.topic)
-	} else {
-		d.log.Debug("created topic", zap.String("topic", d.topic))
+		// topic would be nil if it already exists
+		d.gtopic = d.gclient.Topic(d.topic)
 	}
 
-	_, err = d.client.CreateSubscription(ctx, d.sub, pubsub.SubscriptionConfig{
-		Topic:       topic,
+	d.log.Debug("created topic", zap.String("topic", d.gtopic.String()))
+
+	d.gsub, err = d.gclient.CreateSubscription(ctx, d.sub, pubsub.SubscriptionConfig{
+		Topic:       d.gtopic,
 		AckDeadline: 10 * time.Minute,
 	})
 	if err != nil {
@@ -373,13 +386,8 @@ func (d *Driver) manageTopic(ctx context.Context) error {
 			return err
 		}
 	}
+
 	d.log.Debug("created subscription", zap.String("topic", d.topic), zap.String("subscription", d.sub))
 
-	topic.Stop()
-
 	return nil
-}
-
-func ptr[T any](val T) *T {
-	return &val
 }

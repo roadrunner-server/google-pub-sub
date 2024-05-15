@@ -8,10 +8,8 @@ server:
   relay: "pipes"
   relay_timeout: "20s"
 
-google-pub-sub:
-  project_id: test
-  topic: rrTopic
-  skip_topic_declaration: false
+google_pub_sub:
+  insecure: true
   host: 127.0.0.1:8085
 
 logs:

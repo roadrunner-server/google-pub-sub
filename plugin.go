@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	pluginName       string = "google-pub-sub"
+	pluginName       string = "google_pub_sub"
 	masterPluginName string = "jobs"
 )
 
