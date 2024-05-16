@@ -20,6 +20,8 @@ require (
 	github.com/roadrunner-server/server/v4 v4.8.1
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
+	google.golang.org/api v0.181.0
+	google.golang.org/grpc v1.64.0
 )
 
 require (
@@ -89,11 +91,9 @@ require (
 	golang.org/x/sys v0.20.0 // indirect
 	golang.org/x/text v0.15.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
-	google.golang.org/api v0.180.0 // indirect
 	google.golang.org/genproto v0.0.0-20240515191416-fc5f0ca64291 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240515191416-fc5f0ca64291 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240515191416-fc5f0ca64291 // indirect
-	google.golang.org/grpc v1.64.0 // indirect
 	google.golang.org/protobuf v1.34.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
