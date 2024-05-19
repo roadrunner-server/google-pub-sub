@@ -8,16 +8,16 @@ require (
 	cloud.google.com/go/pubsub v1.38.0
 	github.com/google/uuid v1.6.0
 	github.com/roadrunner-server/api/v4 v4.12.0
-	github.com/roadrunner-server/config/v4 v4.8.1
+	github.com/roadrunner-server/config/v4 v4.8.2
 	github.com/roadrunner-server/endure/v2 v2.4.4
 	github.com/roadrunner-server/google-pub-sub/v4 v4.0.0-20240315194731-a530eba2bb5f
 	github.com/roadrunner-server/goridge/v3 v3.8.2
-	github.com/roadrunner-server/informer/v4 v4.5.1
-	github.com/roadrunner-server/jobs/v4 v4.9.1
-	github.com/roadrunner-server/logger/v4 v4.4.1
-	github.com/roadrunner-server/resetter/v4 v4.3.1
-	github.com/roadrunner-server/rpc/v4 v4.4.1
-	github.com/roadrunner-server/server/v4 v4.8.1
+	github.com/roadrunner-server/informer/v4 v4.5.2
+	github.com/roadrunner-server/jobs/v4 v4.9.2
+	github.com/roadrunner-server/logger/v4 v4.4.2
+	github.com/roadrunner-server/resetter/v4 v4.3.2
+	github.com/roadrunner-server/rpc/v4 v4.4.2
+	github.com/roadrunner-server/server/v4 v4.8.2
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
 	google.golang.org/api v0.181.0
@@ -26,7 +26,7 @@ require (
 
 require (
 	cloud.google.com/go v0.113.0 // indirect
-	cloud.google.com/go/auth v0.4.1 // indirect
+	cloud.google.com/go/auth v0.4.2 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.2 // indirect
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	cloud.google.com/go/iam v1.1.8 // indirect
