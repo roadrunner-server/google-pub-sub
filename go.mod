@@ -4,7 +4,7 @@ go 1.22.3
 
 require (
 	cloud.google.com/go/pubsub v1.38.0
-	github.com/goccy/go-json v0.10.2
+	github.com/goccy/go-json v0.10.3
 	github.com/roadrunner-server/api/v4 v4.12.0
 	github.com/roadrunner-server/endure/v2 v2.4.4
 	github.com/roadrunner-server/errors v1.4.0
