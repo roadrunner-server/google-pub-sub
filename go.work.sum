@@ -83,6 +83,7 @@ cloud.google.com/go/compute v1.20.1/go.mod h1:4tCnrn48xsqlwSAiLf1HXMQk8CONslYbdi
 cloud.google.com/go/compute v1.23.0/go.mod h1:4tCnrn48xsqlwSAiLf1HXMQk8CONslYbdiEZc9FEIbM=
 cloud.google.com/go/compute v1.23.1/go.mod h1:CqB3xpmPKKt3OJpW2ndFIXnA9A4xAy/F3Xp1ixncW78=
 cloud.google.com/go/compute v1.26.0/go.mod h1:T9RIRap4pVHCGUkVFRJ9hygT3KCXjip41X1GgWtBBII=
+cloud.google.com/go/compute v1.27.0 h1:EGawh2RUnfHT5g8f/FX3Ds6KZuIBC77hZoDrBvEZw94=
 cloud.google.com/go/contactcenterinsights v1.12.1/go.mod h1:HHX5wrz5LHVAwfI2smIotQG9x8Qd6gYilaHcLLLmNis=
 cloud.google.com/go/contactcenterinsights v1.13.2 h1:46ertIh+cGkTg/lN7fN+TOx09SoM65dpdUp96vXBcMY=
 cloud.google.com/go/contactcenterinsights v1.13.2/go.mod h1:AfkSB8t7mt2sIY6WpfO61nD9J9fcidIchtxm9FqJVXk=
