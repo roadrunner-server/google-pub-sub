@@ -5,7 +5,7 @@ go 1.22.4
 require (
 	cloud.google.com/go/pubsub v1.39.0
 	github.com/goccy/go-json v0.10.3
-	github.com/roadrunner-server/api/v4 v4.12.0
+	github.com/roadrunner-server/api/v4 v4.14.0
 	github.com/roadrunner-server/endure/v2 v2.4.5
 	github.com/roadrunner-server/errors v1.4.0
 	go.opentelemetry.io/contrib/propagators/jaeger v1.27.0
@@ -46,7 +46,7 @@ require (
 	golang.org/x/text v0.16.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	google.golang.org/genproto v0.0.0-20240617180043-68d350f18fd4 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240617180043-68d350f18fd4 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240617180043-68d350f18fd4 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240624140628-dc46fd24d27d // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240624140628-dc46fd24d27d // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 )
