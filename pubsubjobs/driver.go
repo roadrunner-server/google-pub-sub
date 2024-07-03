@@ -10,8 +10,9 @@ import (
 
 	"cloud.google.com/go/pubsub"
 	"github.com/goccy/go-json"
-	"github.com/roadrunner-server/api/v4/plugins/v3/jobs"
+	"github.com/roadrunner-server/api/v4/plugins/v4/jobs"
 	"github.com/roadrunner-server/errors"
+	"github.com/roadrunner-server/events"
 	jprop "go.opentelemetry.io/contrib/propagators/jaeger"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
@@ -33,23 +34,32 @@ var _ jobs.Driver = (*Driver)(nil)
 type Configurer interface {
 	// UnmarshalKey takes a single key and unmarshal it into a Struct.
 	UnmarshalKey(name string, out any) error
-	// Has checks if config section exists.
+	// Has checks if a config section exists.
 	Has(name string) bool
 }
 
 type Driver struct {
 	mu sync.Mutex
 
-	log         *zap.Logger
-	pq          jobs.Queue
-	pipeline    atomic.Pointer[jobs.Pipeline]
-	tracer      *sdktrace.TracerProvider
-	prop        propagation.TextMapPropagator
-	skipDeclare bool
-	topic       string
-	sub         string
+	log                 *zap.Logger
+	pq                  jobs.Queue
+	pipeline            atomic.Pointer[jobs.Pipeline]
+	tracer              *sdktrace.TracerProvider
+	prop                propagation.TextMapPropagator
+	skipDeclare         bool
+	topic               string
+	dltopic             string
+	sub                 string
+	maxDeliveryAttempts int
+
+	// events
+	eventsCh chan events.Event
+	eventBus *events.Bus
+	id       string
+
 	// pubsub specific
 	gsub    *pubsub.Subscription
+	dlsub   *pubsub.Subscription
 	gtopic  *pubsub.Topic
 	gclient *pubsub.Client
 
@@ -57,7 +67,7 @@ type Driver struct {
 	receiveCtxCancel context.CancelFunc
 	rctx             context.Context
 
-	// if user invoke several resume operations
+	// if a user invokes several resume operations
 	listeners uint32
 	stopped   uint64
 }
@@ -114,18 +124,28 @@ func FromConfig(tracer *sdktrace.TracerProvider, configKey string, pipe jobs.Pip
 		return nil, err
 	}
 
+	eventsCh := make(chan events.Event, 1)
+	eventBus, id := events.NewEventBus()
+
 	jb := &Driver{
-		tracer:      tracer,
-		prop:        prop,
-		log:         log,
-		skipDeclare: conf.SkipTopicDeclaration,
-		topic:       conf.Topic,
-		pq:          pq,
-		sub:         pipe.Name(),
-		gclient:     gclient,
+		tracer:              tracer,
+		prop:                prop,
+		log:                 log,
+		skipDeclare:         conf.SkipTopicDeclaration,
+		topic:               conf.Topic,
+		dltopic:             conf.DeadLetterTopic,
+		maxDeliveryAttempts: conf.MaxDeliveryAttempts,
+		pq:                  pq,
+		sub:                 pipe.Name(),
+		gclient:             gclient,
+
+		// events
+		eventsCh: eventsCh,
+		eventBus: eventBus,
+		id:       id,
 	}
 
-	err = jb.manageTopic()
+	err = jb.manageSubscriptions()
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -159,7 +179,10 @@ func FromPipeline(tracer *sdktrace.TracerProvider, pipe jobs.Pipeline, log *zap.
 
 	conf.ProjectID = pipe.String(projectIDKey, "")
 	conf.Topic = pipe.String(topicKey, "")
+	conf.DeadLetterTopic = pipe.String(deadLetterTopic, "")
+	conf.MaxDeliveryAttempts = pipe.Int(maxDeliveryAttempts, 10)
 	conf.SkipTopicDeclaration = pipe.Bool(skipTopicKey, false)
+	conf.Priority = pipe.Int(priorityKey, 10)
 
 	err = conf.InitDefaults()
 	if err != nil {
@@ -181,6 +204,9 @@ func FromPipeline(tracer *sdktrace.TracerProvider, pipe jobs.Pipeline, log *zap.
 		return nil, err
 	}
 
+	eventsCh := make(chan events.Event, 1)
+	eventBus, id := events.NewEventBus()
+
 	jb := &Driver{
 		prop:        prop,
 		tracer:      tracer,
@@ -190,9 +216,14 @@ func FromPipeline(tracer *sdktrace.TracerProvider, pipe jobs.Pipeline, log *zap.
 		topic:       conf.Topic,
 		sub:         pipe.Name(),
 		gclient:     gclient,
+
+		// events
+		eventsCh: eventsCh,
+		eventBus: eventBus,
+		id:       id,
 	}
 
-	err = jb.manageTopic()
+	err = jb.manageSubscriptions()
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -215,34 +246,7 @@ func (d *Driver) Push(ctx context.Context, jb jobs.Message) error {
 		return errors.E(op, errors.Errorf("no such pipeline: %s, actual: %s", jb.GroupID(), pipe.Name()))
 	}
 
-	job := fromJob(jb)
-
-	data, err := json.Marshal(job.Metadata)
-	if err != nil {
-		return err
-	}
-
-	result := d.gtopic.Publish(ctx, &pubsub.Message{
-		Data: jb.Payload(),
-		Attributes: map[string]string{
-			jobs.RRID:       job.Ident,
-			jobs.RRJob:      job.Job,
-			jobs.RRDelay:    strconv.Itoa(int(job.Options.Delay)),
-			jobs.RRHeaders:  string(data),
-			jobs.RRPriority: strconv.Itoa(int(job.Options.Priority)),
-			jobs.RRAutoAck:  btos(job.Options.AutoAck),
-		},
-		PublishTime: time.Now().UTC(),
-	})
-
-	id, err := result.Get(ctx)
-	if err != nil {
-		return err
-	}
-
-	d.log.Debug("Message published", zap.String("messageId", id))
-
-	return nil
+	return d.handlePush(ctx, fromJob(jb))
 }
 
 func (d *Driver) Run(ctx context.Context, p jobs.Pipeline) error {
@@ -271,6 +275,8 @@ func (d *Driver) Run(ctx context.Context, p jobs.Pipeline) error {
 func (d *Driver) State(ctx context.Context) (*jobs.State, error) {
 	_, span := trace.SpanFromContext(ctx).TracerProvider().Tracer(tracerName).Start(ctx, "google_pub_sub_state")
 	defer span.End()
+
+	d.log.Warn("State method is not implemented, please, use Google PubSub monitoring tools")
 
 	return nil, nil
 }
@@ -335,6 +341,7 @@ func (d *Driver) Resume(ctx context.Context, p string) error {
 
 func (d *Driver) Stop(ctx context.Context) error {
 	start := time.Now().UTC()
+	atomic.StoreUint64(&d.stopped, 1)
 
 	_, span := trace.SpanFromContext(ctx).TracerProvider().Tracer(tracerName).Start(ctx, "google_pub_sub_stop")
 	defer span.End()
@@ -344,7 +351,6 @@ func (d *Driver) Stop(ctx context.Context) error {
 
 	d.checkCtxAndCancel()
 
-	atomic.StoreUint64(&d.stopped, 1)
 	d.gtopic.Stop()
 
 	err := d.gclient.Close()
@@ -356,15 +362,12 @@ func (d *Driver) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (d *Driver) manageTopic() error {
-	if d.skipDeclare {
-		return nil
-	}
-
+func (d *Driver) manageSubscriptions() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
 	var err error
+	// Create regular topic
 	d.gtopic, err = d.gclient.CreateTopic(ctx, d.topic)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Topic already exists") {
@@ -374,12 +377,29 @@ func (d *Driver) manageTopic() error {
 		// topic would be nil if it already exists
 		d.gtopic = d.gclient.Topic(d.topic)
 	}
-
 	d.log.Debug("created topic", zap.String("topic", d.gtopic.String()))
 
+	// check or create a Dead Letter Topic
+	var dltopic *pubsub.Topic
+
+	if d.dltopic != "" {
+		dltopic, err = d.gclient.CreateTopic(ctx, d.dltopic)
+		if err != nil {
+			if !strings.Contains(err.Error(), "Topic already exists") {
+				return err
+			}
+
+			// topic would be nil if it already exists
+			dltopic = d.gclient.Topic(d.dltopic)
+		}
+
+		d.log.Debug("created dead letter topic", zap.String("topic", dltopic.String()))
+	}
+
 	d.gsub, err = d.gclient.CreateSubscription(ctx, d.sub, pubsub.SubscriptionConfig{
-		Topic:       d.gtopic,
-		AckDeadline: 10 * time.Minute,
+		Topic:            d.gtopic,
+		AckDeadline:      time.Hour,
+		DeadLetterPolicy: initOrNil(dltopic, d.maxDeliveryAttempts),
 	})
 	if err != nil {
 		if !strings.Contains(err.Error(), "Subscription already exists") {
@@ -388,6 +408,46 @@ func (d *Driver) manageTopic() error {
 	}
 
 	d.log.Debug("created subscription", zap.String("topic", d.topic), zap.String("subscription", d.sub))
+
+	return nil
+}
+
+func initOrNil(deadLetterTopic *pubsub.Topic, maxDeliveryAttempts int) *pubsub.DeadLetterPolicy {
+	if deadLetterTopic == nil || deadLetterTopic.String() == "" {
+		return nil
+	}
+
+	return &pubsub.DeadLetterPolicy{
+		DeadLetterTopic:     deadLetterTopic.String(),
+		MaxDeliveryAttempts: maxDeliveryAttempts,
+	}
+}
+
+func (d *Driver) handlePush(ctx context.Context, job *Item) error {
+	data, err := json.Marshal(job.Headers())
+	if err != nil {
+		return err
+	}
+
+	result := d.gtopic.Publish(ctx, &pubsub.Message{
+		Data: job.Payload,
+		Attributes: map[string]string{
+			jobs.RRID:       job.Ident,
+			jobs.RRJob:      job.Job,
+			jobs.RRDelay:    strconv.Itoa(int(job.Options.Delay)),
+			jobs.RRHeaders:  string(data),
+			jobs.RRPriority: strconv.Itoa(int(job.Options.Priority)),
+			jobs.RRAutoAck:  btos(job.Options.AutoAck),
+		},
+		PublishTime: time.Now().UTC(),
+	})
+
+	id, err := result.Get(ctx)
+	if err != nil {
+		return err
+	}
+
+	d.log.Debug("Message published", zap.String("messageId", id))
 
 	return nil
 }
