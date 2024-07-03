@@ -1,4 +1,4 @@
-version: '3'
+version: "3"
 
 rpc:
   listen: tcp://127.0.0.1:6601
@@ -42,4 +42,4 @@ jobs:
         skip_topic_declaration: false
         tags:
           test: "tag"
-  consume: [ "test-3", "test-4" ]
+  consume: ["test-3", "test-4"]

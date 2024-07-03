@@ -208,11 +208,12 @@ func TestJobsError(t *testing.T) {
 		Prefix:  "rr",
 	}
 
+	l, oLogger := mocklogger.ZapTestLogger(zap.DebugLevel)
 	err = cont.RegisterAll(
 		cfg,
 		&server.Plugin{},
 		&rpcPlugin.Plugin{},
-		&logger.Plugin{},
+		l,
 		&jobs.Plugin{},
 		&resetter.Plugin{},
 		&informer.Plugin{},
@@ -278,6 +279,14 @@ func TestJobsError(t *testing.T) {
 	time.Sleep(time.Second * 5)
 	stopCh <- struct{}{}
 	wg.Wait()
+
+	require.Equal(t, 1, oLogger.FilterMessageSnippet("job was pushed successfully").Len())
+	require.Equal(t, 4, oLogger.FilterMessageSnippet("job processing was started").Len())
+	require.Equal(t, 4, oLogger.FilterMessageSnippet("job was processed successfully").Len())
+	require.Equal(t, 1, oLogger.FilterMessageSnippet("pipeline was paused").Len())
+	require.Equal(t, 1, oLogger.FilterMessageSnippet("pipeline was resumed").Len())
+	require.Equal(t, 1, oLogger.FilterMessageSnippet("pipeline was stopped").Len())
+	require.Equal(t, 1, oLogger.FilterMessageSnippet("delivery channel was closed, leaving the AMQP listener").Len())
 
 	time.Sleep(time.Second * 5)
 }

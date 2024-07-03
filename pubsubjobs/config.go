@@ -6,9 +6,12 @@ import (
 
 // pipeline rabbitmq info
 const (
-	skipTopicKey string = "skip_topic_declaration"
-	projectIDKey string = "project_id"
-	topicKey     string = "topic"
+	skipTopicKey        string = "skip_topic_declaration"
+	projectIDKey        string = "project_id"
+	deadLetterTopic     string = "dead_letter_topic"
+	topicKey            string = "topic"
+	maxDeliveryAttempts string = "max_delivery_attempts"
+	priorityKey         string = "priority"
 )
 
 // config is used to parse pipeline configuration
@@ -20,8 +23,10 @@ type config struct {
 	// local
 	SkipTopicDeclaration bool   `mapstructure:"skip_topic_declaration"`
 	ProjectID            string `mapstructure:"project_id"`
-	Priority             int64  `mapstructure:"priority"`
+	DeadLetterTopic      string `mapstructure:"dead_letter_topic"`
 	Topic                string `mapstructure:"topic"`
+	MaxDeliveryAttempts  int    `mapstructure:"max_delivery_attempts"`
+	Priority             int    `mapstructure:"priority"`
 }
 
 func (c *config) InitDefaults() error {
@@ -39,6 +44,10 @@ func (c *config) InitDefaults() error {
 
 	if c.Endpoint == "" {
 		c.Endpoint = "127.0.0.1:8085"
+	}
+
+	if c.DeadLetterTopic != "" && c.MaxDeliveryAttempts == 0 {
+		c.MaxDeliveryAttempts = 10
 	}
 
 	return nil
