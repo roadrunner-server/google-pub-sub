@@ -464,6 +464,6 @@ func TestRemovePQ(t *testing.T) {
 	assert.Equal(t, 2, oLogger.FilterMessageSnippet("pipeline was started").Len())
 	assert.Equal(t, 2, oLogger.FilterMessageSnippet("pipeline was stopped").Len())
 	assert.Equal(t, 20, oLogger.FilterMessageSnippet("job was pushed successfully").Len())
-	assert.Equal(t, 2, oLogger.FilterMessageSnippet("job processing was started").Len())
+	assert.Equal(t, 4, oLogger.FilterMessageSnippet("job processing was started").Len())
 	assert.Equal(t, 2, oLogger.FilterMessageSnippet("listener was stopped").Len())
 }
