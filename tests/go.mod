@@ -2,27 +2,27 @@ module tests
 
 go 1.22.5
 
-replace github.com/roadrunner-server/google-pub-sub/v5 => ../
-
 require (
 	cloud.google.com/go/pubsub v1.40.0
 	github.com/google/uuid v1.6.0
 	github.com/roadrunner-server/api/v4 v4.15.0
-	github.com/roadrunner-server/config/v4 v4.9.3
+	github.com/roadrunner-server/config/v5 v5.0.0
 	github.com/roadrunner-server/endure/v2 v2.4.5
-	github.com/roadrunner-server/google-pub-sub/v4 v4.0.1
+	github.com/roadrunner-server/google-pub-sub/v5 v5.0.0-00010101000000-000000000000
 	github.com/roadrunner-server/goridge/v3 v3.8.2
-	github.com/roadrunner-server/informer/v4 v4.5.5
-	github.com/roadrunner-server/jobs/v4 v4.10.0
-	github.com/roadrunner-server/logger/v4 v4.4.5
-	github.com/roadrunner-server/resetter/v4 v4.3.5
-	github.com/roadrunner-server/rpc/v4 v4.4.5
-	github.com/roadrunner-server/server/v4 v4.8.5
+	github.com/roadrunner-server/informer/v5 v5.0.0
+	github.com/roadrunner-server/jobs/v5 v5.0.0
+	github.com/roadrunner-server/logger/v5 v5.0.0
+	github.com/roadrunner-server/resetter/v5 v5.0.0
+	github.com/roadrunner-server/rpc/v5 v5.0.0
+	github.com/roadrunner-server/server/v5 v5.0.0
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
 	google.golang.org/api v0.187.0
 	google.golang.org/grpc v1.65.0
 )
+
+replace github.com/roadrunner-server/google-pub-sub/v5 => ../
 
 require (
 	cloud.google.com/go v0.115.0 // indirect
@@ -59,7 +59,9 @@ require (
 	github.com/prometheus/common v0.55.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/roadrunner-server/errors v1.4.0 // indirect
-	github.com/roadrunner-server/sdk/v4 v4.8.0 // indirect
+	github.com/roadrunner-server/events v1.0.0 // indirect
+	github.com/roadrunner-server/pool v1.0.0 // indirect
+	github.com/roadrunner-server/priority_queue v1.0.1 // indirect
 	github.com/roadrunner-server/tcplisten v1.5.0 // indirect
 	github.com/sagikazarmark/locafero v0.6.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
@@ -84,12 +86,12 @@ require (
 	go.opentelemetry.io/otel/sdk v1.28.0 // indirect
 	go.opentelemetry.io/otel/trace v1.28.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.24.0 // indirect
-	golang.org/x/exp v0.0.0-20240613232115-7f521ea00fb8 // indirect
-	golang.org/x/net v0.26.0 // indirect
+	golang.org/x/crypto v0.25.0 // indirect
+	golang.org/x/exp v0.0.0-20240707233637-46b078467d37 // indirect
+	golang.org/x/net v0.27.0 // indirect
 	golang.org/x/oauth2 v0.21.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
-	golang.org/x/sys v0.21.0 // indirect
+	golang.org/x/sys v0.22.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	google.golang.org/genproto v0.0.0-20240701130421-f6361c86f094 // indirect
