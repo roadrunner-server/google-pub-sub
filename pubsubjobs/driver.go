@@ -397,8 +397,9 @@ func (d *Driver) manageSubscriptions() error {
 	}
 
 	d.gsub, err = d.gclient.CreateSubscription(ctx, d.sub, pubsub.SubscriptionConfig{
-		Topic:            d.gtopic,
-		AckDeadline:      time.Hour,
+		Topic: d.gtopic,
+		// Ack dedline should be between 10 seconds and 10 minutes
+		AckDeadline:      time.Minute * 5,
 		DeadLetterPolicy: initOrNil(dltopic, d.maxDeliveryAttempts),
 	})
 	if err != nil {
