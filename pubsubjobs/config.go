@@ -44,8 +44,10 @@ func (c *config) InitDefaults() error {
 		c.Endpoint = "127.0.0.1:8085"
 	}
 
-	if c.DeadLetterTopic != "" && c.MaxDeliveryAttempts == 0 {
-		c.MaxDeliveryAttempts = 10
+	if c.DeadLetterTopic != "" {
+		if c.MaxDeliveryAttempts == 0 {
+			c.MaxDeliveryAttempts = 10
+		}
 	}
 
 	return nil
