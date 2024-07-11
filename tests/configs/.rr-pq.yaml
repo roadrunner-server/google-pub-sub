@@ -31,8 +31,6 @@ jobs:
         project_id: test
         topic: rrTopic6
         skip_topic_declaration: false
-        tags:
-          test: "tag-pq"
 
     test-4:
       driver: google_pub_sub
@@ -40,6 +38,4 @@ jobs:
         project_id: test
         topic: rrTopic7
         skip_topic_declaration: false
-        tags:
-          test: "tag"
   consume: ["test-3", "test-4"]

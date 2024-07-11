@@ -155,7 +155,6 @@ func DeclarePipe(topic string, address string, pipeline string) func(t *testing.
 			"topic":                  topic,
 			"skip_topic_declaration": "false",
 			"project_id":             "test",
-			"tags":                   `{"key":"value"}`,
 		}}
 
 		er := &jobsProto.Empty{}

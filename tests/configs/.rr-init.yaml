@@ -34,8 +34,6 @@ jobs:
         topic: rrTopic1
         skip_topic_declaration: false
         dead_letter_topic: "dead-letter-topic"
-        tags:
-          test: "tag"
 
     test-2:
       driver: google_pub_sub
@@ -43,6 +41,4 @@ jobs:
         project_id: test
         topic: rrTopic2
         skip_topic_declaration: false
-        tags:
-          test: "tag"
   consume: ["test-1", "test-2"]
