@@ -385,7 +385,7 @@ func (d *Driver) manageSubscriptions() error {
 	if d.dltopicStr != "" {
 		dltopic, err = d.gclient.CreateTopic(ctx, d.dltopicStr)
 		if err != nil {
-			if !strings.Contains(err.Error(), "Topic already exists") {
+			if !strings.Contains(err.Error(), "already exists") {
 				return err
 			}
 
@@ -405,7 +405,7 @@ func (d *Driver) manageSubscriptions() error {
 	})
 
 	if err != nil {
-		if !strings.Contains(err.Error(), "Subscription already exists") {
+		if !strings.Contains(err.Error(), "already exists") {
 			return err
 		}
 	}
