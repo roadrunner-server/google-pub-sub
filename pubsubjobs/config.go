@@ -6,7 +6,6 @@ import (
 
 // pipeline rabbitmq info
 const (
-	skipTopicKey        string = "skip_topic_declaration"
 	projectIDKey        string = "project_id"
 	deadLetterTopic     string = "dead_letter_topic"
 	topicKey            string = "topic"
@@ -21,12 +20,11 @@ type config struct {
 	Insecure bool   `mapstructure:"insecure"`
 
 	// local
-	SkipTopicDeclaration bool   `mapstructure:"skip_topic_declaration"`
-	ProjectID            string `mapstructure:"project_id"`
-	DeadLetterTopic      string `mapstructure:"dead_letter_topic"`
-	Topic                string `mapstructure:"topic"`
-	MaxDeliveryAttempts  int    `mapstructure:"max_delivery_attempts"`
-	Priority             int    `mapstructure:"priority"`
+	ProjectID           string `mapstructure:"project_id"`
+	DeadLetterTopic     string `mapstructure:"dead_letter_topic"`
+	Topic               string `mapstructure:"topic"`
+	MaxDeliveryAttempts int    `mapstructure:"max_delivery_attempts"`
+	Priority            int    `mapstructure:"priority"`
 }
 
 func (c *config) InitDefaults() error {

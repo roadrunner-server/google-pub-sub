@@ -32,7 +32,6 @@ jobs:
       config:
         project_id: test
         topic: rrTopic1
-        skip_topic_declaration: false
         dead_letter_topic: "dead-letter-topic"
 
     test-2:
@@ -40,5 +39,4 @@ jobs:
       config:
         project_id: test
         topic: rrTopic2
-        skip_topic_declaration: false
   consume: ["test-1", "test-2"]

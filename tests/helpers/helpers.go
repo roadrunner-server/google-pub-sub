@@ -149,12 +149,12 @@ func DeclarePipe(topic string, address string, pipeline string) func(t *testing.
 		client := rpc.NewClientWithCodec(goridgeRpc.NewClientCodec(conn))
 
 		pipe := &jobsProto.DeclareRequest{Pipeline: map[string]string{
-			"driver":                 "google_pub_sub",
-			"name":                   pipeline,
-			"priority":               "3",
-			"topic":                  topic,
-			"skip_topic_declaration": "false",
-			"project_id":             "test",
+			"driver":            "google_pub_sub",
+			"name":              pipeline,
+			"priority":          "3",
+			"topic":             topic,
+			"dead_letter_topic": "dead_letter_topic",
+			"project_id":        "test",
 		}}
 
 		er := &jobsProto.Empty{}

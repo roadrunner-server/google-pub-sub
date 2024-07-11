@@ -46,7 +46,6 @@ type Driver struct {
 	pipeline            atomic.Pointer[jobs.Pipeline]
 	tracer              *sdktrace.TracerProvider
 	prop                propagation.TextMapPropagator
-	skipDeclare         bool
 	topic               string
 	dltopic             string
 	sub                 string
@@ -131,7 +130,6 @@ func FromConfig(tracer *sdktrace.TracerProvider, configKey string, pipe jobs.Pip
 		tracer:              tracer,
 		prop:                prop,
 		log:                 log,
-		skipDeclare:         conf.SkipTopicDeclaration,
 		topic:               conf.Topic,
 		dltopic:             conf.DeadLetterTopic,
 		maxDeliveryAttempts: conf.MaxDeliveryAttempts,
@@ -181,7 +179,6 @@ func FromPipeline(tracer *sdktrace.TracerProvider, pipe jobs.Pipeline, log *zap.
 	conf.Topic = pipe.String(topicKey, "")
 	conf.DeadLetterTopic = pipe.String(deadLetterTopic, "")
 	conf.MaxDeliveryAttempts = pipe.Int(maxDeliveryAttempts, 10)
-	conf.SkipTopicDeclaration = pipe.Bool(skipTopicKey, false)
 	conf.Priority = pipe.Int(priorityKey, 10)
 
 	err = conf.InitDefaults()
@@ -208,14 +205,13 @@ func FromPipeline(tracer *sdktrace.TracerProvider, pipe jobs.Pipeline, log *zap.
 	eventBus, id := events.NewEventBus()
 
 	jb := &Driver{
-		prop:        prop,
-		tracer:      tracer,
-		log:         log,
-		pq:          pq,
-		skipDeclare: conf.SkipTopicDeclaration,
-		topic:       conf.Topic,
-		sub:         pipe.Name(),
-		gclient:     gclient,
+		prop:    prop,
+		tracer:  tracer,
+		log:     log,
+		pq:      pq,
+		topic:   conf.Topic,
+		sub:     pipe.Name(),
+		gclient: gclient,
 
 		// events
 		eventsCh: eventsCh,
@@ -377,7 +373,8 @@ func (d *Driver) manageSubscriptions() error {
 		// topic would be nil if it already exists
 		d.gtopic = d.gclient.Topic(d.topic)
 	}
-	d.log.Debug("created topic", zap.String("topic", d.gtopic.String()))
+
+	d.log.Debug("created/used topic", zap.String("topic", d.gtopic.String()))
 
 	// check or create a Dead Letter Topic
 	var dltopic *pubsub.Topic
@@ -393,7 +390,7 @@ func (d *Driver) manageSubscriptions() error {
 			dltopic = d.gclient.Topic(d.dltopic)
 		}
 
-		d.log.Debug("created dead letter topic", zap.String("topic", dltopic.String()))
+		d.log.Debug("created/used dead letter topic", zap.String("topic", dltopic.String()))
 	}
 
 	d.gsub, err = d.gclient.CreateSubscription(ctx, d.sub, pubsub.SubscriptionConfig{
