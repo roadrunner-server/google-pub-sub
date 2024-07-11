@@ -41,15 +41,11 @@ type Configurer interface {
 type Driver struct {
 	mu sync.Mutex
 
-	log                 *zap.Logger
-	pq                  jobs.Queue
-	pipeline            atomic.Pointer[jobs.Pipeline]
-	tracer              *sdktrace.TracerProvider
-	prop                propagation.TextMapPropagator
-	topic               string
-	dltopic             string
-	sub                 string
-	maxDeliveryAttempts int
+	log      *zap.Logger
+	pq       jobs.Queue
+	pipeline atomic.Pointer[jobs.Pipeline]
+	tracer   *sdktrace.TracerProvider
+	prop     propagation.TextMapPropagator
 
 	// events
 	eventsCh chan events.Event
@@ -57,10 +53,13 @@ type Driver struct {
 	id       string
 
 	// pubsub specific
-	gsub    *pubsub.Subscription
-	dlsub   *pubsub.Subscription
-	gtopic  *pubsub.Topic
-	gclient *pubsub.Client
+	gsub                *pubsub.Subscription
+	gtopic              *pubsub.Topic
+	gclient             *pubsub.Client
+	topicStr            string
+	dltopicStr          string
+	subStr              string
+	maxDeliveryAttempts int
 
 	// context cancel func used to cancel the pubsub subscription
 	receiveCtxCancel context.CancelFunc
@@ -130,11 +129,11 @@ func FromConfig(tracer *sdktrace.TracerProvider, configKey string, pipe jobs.Pip
 		tracer:              tracer,
 		prop:                prop,
 		log:                 log,
-		topic:               conf.Topic,
-		dltopic:             conf.DeadLetterTopic,
+		topicStr:            conf.Topic,
+		dltopicStr:          conf.DeadLetterTopic,
 		maxDeliveryAttempts: conf.MaxDeliveryAttempts,
 		pq:                  pq,
-		sub:                 pipe.Name(),
+		subStr:              pipe.Name(),
 		gclient:             gclient,
 
 		// events
@@ -205,13 +204,13 @@ func FromPipeline(tracer *sdktrace.TracerProvider, pipe jobs.Pipeline, log *zap.
 	eventBus, id := events.NewEventBus()
 
 	jb := &Driver{
-		prop:    prop,
-		tracer:  tracer,
-		log:     log,
-		pq:      pq,
-		topic:   conf.Topic,
-		sub:     pipe.Name(),
-		gclient: gclient,
+		prop:     prop,
+		tracer:   tracer,
+		log:      log,
+		pq:       pq,
+		topicStr: conf.Topic,
+		subStr:   pipe.Name(),
+		gclient:  gclient,
 
 		// events
 		eventsCh: eventsCh,
@@ -262,6 +261,8 @@ func (d *Driver) Run(ctx context.Context, p jobs.Pipeline) error {
 
 	atomic.AddUint32(&d.listeners, 1)
 
+	d.log.Debug("start listening for messages", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start))
+
 	d.listen()
 
 	d.log.Debug("pipeline was started", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
@@ -295,6 +296,7 @@ func (d *Driver) Pause(ctx context.Context, p string) error {
 		return errors.Str("no active listeners, nothing to pause")
 	}
 
+	d.log.Debug("stop listening for messages", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start))
 	// stop the listener
 	d.gtopic.Stop()
 
@@ -326,6 +328,7 @@ func (d *Driver) Resume(ctx context.Context, p string) error {
 		return errors.Str("listener is already in the active state")
 	}
 
+	d.log.Debug("resume listening for messages", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start))
 	d.listen()
 
 	// increase num of listeners
@@ -364,14 +367,14 @@ func (d *Driver) manageSubscriptions() error {
 
 	var err error
 	// Create regular topic
-	d.gtopic, err = d.gclient.CreateTopic(ctx, d.topic)
+	d.gtopic, err = d.gclient.CreateTopic(ctx, d.topicStr)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Topic already exists") {
 			return err
 		}
 
 		// topic would be nil if it already exists
-		d.gtopic = d.gclient.Topic(d.topic)
+		d.gtopic = d.gclient.Topic(d.topicStr)
 	}
 
 	d.log.Debug("created/used topic", zap.String("topic", d.gtopic.String()))
@@ -379,33 +382,35 @@ func (d *Driver) manageSubscriptions() error {
 	// check or create a Dead Letter Topic
 	var dltopic *pubsub.Topic
 
-	if d.dltopic != "" {
-		dltopic, err = d.gclient.CreateTopic(ctx, d.dltopic)
+	if d.dltopicStr != "" {
+		dltopic, err = d.gclient.CreateTopic(ctx, d.dltopicStr)
 		if err != nil {
 			if !strings.Contains(err.Error(), "Topic already exists") {
 				return err
 			}
 
 			// topic would be nil if it already exists
-			dltopic = d.gclient.Topic(d.dltopic)
+			dltopic = d.gclient.Topic(d.dltopicStr)
 		}
 
 		d.log.Debug("created/used dead letter topic", zap.String("topic", dltopic.String()))
 	}
 
-	d.gsub, err = d.gclient.CreateSubscription(ctx, d.sub, pubsub.SubscriptionConfig{
+	// Create subscription but not listen it
+	d.gsub, err = d.gclient.CreateSubscription(ctx, d.subStr, pubsub.SubscriptionConfig{
 		Topic: d.gtopic,
 		// Ack dedline should be between 10 seconds and 10 minutes
-		AckDeadline:      time.Minute * 5,
+		AckDeadline:      time.Minute * 8,
 		DeadLetterPolicy: initOrNil(dltopic, d.maxDeliveryAttempts),
 	})
+
 	if err != nil {
 		if !strings.Contains(err.Error(), "Subscription already exists") {
 			return err
 		}
 	}
 
-	d.log.Debug("created subscription", zap.String("topic", d.topic), zap.String("subscription", d.sub))
+	d.log.Debug("created subscription, not listening", zap.String("topic", d.topicStr), zap.String("subscription", d.subStr))
 
 	return nil
 }
