@@ -2,10 +2,10 @@ module github.com/roadrunner-server/google-pub-sub/v5
 
 go 1.23
 
-toolchain go1.23.3
+toolchain go1.23.4
 
 require (
-	cloud.google.com/go/pubsub v1.45.1
+	cloud.google.com/go/pubsub v1.45.2
 	github.com/goccy/go-json v0.10.3
 	github.com/roadrunner-server/api/v4 v4.16.0
 	github.com/roadrunner-server/endure/v2 v2.6.1
@@ -49,8 +49,8 @@ require (
 	golang.org/x/sys v0.27.0 // indirect
 	golang.org/x/text v0.20.0 // indirect
 	golang.org/x/time v0.8.0 // indirect
-	google.golang.org/genproto v0.0.0-20241118233622-e639e219e697 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20241118233622-e639e219e697 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20241118233622-e639e219e697 // indirect
+	google.golang.org/genproto v0.0.0-20241202173237-19429a94021a // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20241202173237-19429a94021a // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20241202173237-19429a94021a // indirect
 	google.golang.org/protobuf v1.35.2 // indirect
 )

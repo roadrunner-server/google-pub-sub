@@ -2,10 +2,10 @@ module tests
 
 go 1.23
 
-toolchain go1.23.3
+toolchain go1.23.4
 
 require (
-	cloud.google.com/go/pubsub v1.45.1
+	cloud.google.com/go/pubsub v1.45.2
 	github.com/google/uuid v1.6.0
 	github.com/roadrunner-server/api/v4 v4.16.0
 	github.com/roadrunner-server/config/v5 v5.0.4
@@ -61,7 +61,7 @@ require (
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/roadrunner-server/errors v1.4.1 // indirect
 	github.com/roadrunner-server/events v1.0.1 // indirect
-	github.com/roadrunner-server/pool v1.0.3 // indirect
+	github.com/roadrunner-server/pool v1.1.0 // indirect
 	github.com/roadrunner-server/priority_queue v1.0.2 // indirect
 	github.com/roadrunner-server/tcplisten v1.5.1 // indirect
 	github.com/sagikazarmark/locafero v0.6.0 // indirect
@@ -95,9 +95,9 @@ require (
 	golang.org/x/sys v0.27.0 // indirect
 	golang.org/x/text v0.20.0 // indirect
 	golang.org/x/time v0.8.0 // indirect
-	google.golang.org/genproto v0.0.0-20241118233622-e639e219e697 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20241118233622-e639e219e697 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20241118233622-e639e219e697 // indirect
+	google.golang.org/genproto v0.0.0-20241202173237-19429a94021a // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20241202173237-19429a94021a // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20241202173237-19429a94021a // indirect
 	google.golang.org/protobuf v1.35.2 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
