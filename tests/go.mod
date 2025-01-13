@@ -7,7 +7,7 @@ toolchain go1.23.4
 require (
 	cloud.google.com/go/pubsub v1.45.3
 	github.com/google/uuid v1.6.0
-	github.com/roadrunner-server/api/v4 v4.17.0
+	github.com/roadrunner-server/api/v4 v4.18.1
 	github.com/roadrunner-server/config/v5 v5.1.1
 	github.com/roadrunner-server/endure/v2 v2.6.1
 	github.com/roadrunner-server/google-pub-sub/v5 v5.0.0-00010101000000-000000000000
