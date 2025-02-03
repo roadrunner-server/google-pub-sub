@@ -5,7 +5,7 @@ go 1.23
 toolchain go1.23.4
 
 require (
-	cloud.google.com/go/pubsub v1.46.0
+	cloud.google.com/go/pubsub v1.47.0
 	github.com/goccy/go-json v0.10.5
 	github.com/roadrunner-server/api/v4 v4.18.1
 	github.com/roadrunner-server/endure/v2 v2.6.1
