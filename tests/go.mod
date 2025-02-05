@@ -20,7 +20,7 @@ require (
 	github.com/roadrunner-server/server/v5 v5.2.3
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.27.0
-	google.golang.org/api v0.219.0
+	google.golang.org/api v0.220.0
 	google.golang.org/grpc v1.70.0
 )
 
