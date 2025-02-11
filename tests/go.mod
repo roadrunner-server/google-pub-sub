@@ -8,16 +8,16 @@ require (
 	cloud.google.com/go/pubsub v1.47.0
 	github.com/google/uuid v1.6.0
 	github.com/roadrunner-server/api/v4 v4.18.1
-	github.com/roadrunner-server/config/v5 v5.1.2
+	github.com/roadrunner-server/config/v5 v5.1.3
 	github.com/roadrunner-server/endure/v2 v2.6.1
 	github.com/roadrunner-server/google-pub-sub/v5 v5.0.0-00010101000000-000000000000
 	github.com/roadrunner-server/goridge/v3 v3.8.3
-	github.com/roadrunner-server/informer/v5 v5.1.2
-	github.com/roadrunner-server/jobs/v5 v5.1.2
-	github.com/roadrunner-server/logger/v5 v5.1.2
-	github.com/roadrunner-server/resetter/v5 v5.1.2
-	github.com/roadrunner-server/rpc/v5 v5.1.2
-	github.com/roadrunner-server/server/v5 v5.2.3
+	github.com/roadrunner-server/informer/v5 v5.1.3
+	github.com/roadrunner-server/jobs/v5 v5.1.3
+	github.com/roadrunner-server/logger/v5 v5.1.3
+	github.com/roadrunner-server/resetter/v5 v5.1.3
+	github.com/roadrunner-server/rpc/v5 v5.1.3
+	github.com/roadrunner-server/server/v5 v5.2.4
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.27.0
 	google.golang.org/api v0.220.0
@@ -88,7 +88,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.34.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.33.0 // indirect
-	golang.org/x/exp v0.0.0-20250207012021-f9890c6ad9f3 // indirect
+	golang.org/x/exp v0.0.0-20250210185358-939b2ce775ac // indirect
 	golang.org/x/net v0.35.0 // indirect
 	golang.org/x/oauth2 v0.26.0 // indirect
 	golang.org/x/sync v0.11.0 // indirect
