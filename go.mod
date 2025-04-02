@@ -2,10 +2,8 @@ module github.com/roadrunner-server/google-pub-sub/v5
 
 go 1.24
 
-toolchain go1.24.0
-
 require (
-	cloud.google.com/go/pubsub v1.48.0
+	cloud.google.com/go/pubsub v1.48.1
 	github.com/goccy/go-json v0.10.5
 	github.com/roadrunner-server/api/v4 v4.19.0
 	github.com/roadrunner-server/endure/v2 v2.6.1
