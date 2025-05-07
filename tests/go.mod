@@ -9,7 +9,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/roadrunner-server/api/v4 v4.20.0
 	github.com/roadrunner-server/config/v5 v5.1.7
-	github.com/roadrunner-server/endure/v2 v2.6.1
+	github.com/roadrunner-server/endure/v2 v2.6.2
 	github.com/roadrunner-server/google-pub-sub/v5 v5.0.0-00010101000000-000000000000
 	github.com/roadrunner-server/goridge/v3 v3.8.3
 	github.com/roadrunner-server/informer/v5 v5.1.7
@@ -20,7 +20,7 @@ require (
 	github.com/roadrunner-server/server/v5 v5.2.8
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.27.0
-	google.golang.org/api v0.231.0
+	google.golang.org/api v0.232.0
 	google.golang.org/grpc v1.72.0
 )
 

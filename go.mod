@@ -8,7 +8,7 @@ require (
 	cloud.google.com/go/pubsub v1.49.0
 	github.com/goccy/go-json v0.10.5
 	github.com/roadrunner-server/api/v4 v4.20.0
-	github.com/roadrunner-server/endure/v2 v2.6.1
+	github.com/roadrunner-server/endure/v2 v2.6.2
 	github.com/roadrunner-server/errors v1.4.1
 	github.com/roadrunner-server/events v1.0.1
 	go.opentelemetry.io/contrib/propagators/jaeger v1.35.0
@@ -16,7 +16,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.35.0
 	go.opentelemetry.io/otel/trace v1.35.0
 	go.uber.org/zap v1.27.0
-	google.golang.org/api v0.231.0
+	google.golang.org/api v0.232.0
 	google.golang.org/grpc v1.72.0
 )
 
