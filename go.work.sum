@@ -227,6 +227,7 @@ cloud.google.com/go/compute v1.37.0/go.mod h1:AsK4VqrSyXBo4SMbRtfAO1VfaMjUEjEwv1
 cloud.google.com/go/compute v1.38.0 h1:MilCLYQW2m7Dku8hRIIKo4r0oKastlD74sSu16riYKs=
 cloud.google.com/go/compute v1.39.0 h1:yS74txP+Rn3JnI+YnDevCcOt48PY6q0/dw/Ti1MMHag=
 cloud.google.com/go/compute v1.40.0 h1:dlEzKo/BtyEGNc+SflXwwoBh52dNl/A5BaSYurT0k0k=
+cloud.google.com/go/compute v1.41.0 h1:S+HvMIzBUAFK/73wxkrA4/GwvM7R9d+egGZvih4kp+M=
 cloud.google.com/go/compute/metadata v0.3.0/go.mod h1:zFmK7XCadkQkj6TtorcaGlCW1hT1fIilQDwofLpJ20k=
 cloud.google.com/go/compute/metadata v0.5.0/go.mod h1:aHnloV2TPI38yx4s9+wAZhHykWvVCfu7hQbF+9CWoiY=
 cloud.google.com/go/contactcenterinsights v1.12.1/go.mod h1:HHX5wrz5LHVAwfI2smIotQG9x8Qd6gYilaHcLLLmNis=

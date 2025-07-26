@@ -20,8 +20,8 @@ require (
 	github.com/roadrunner-server/server/v5 v5.2.9
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.27.0
-	google.golang.org/api v0.242.0
-	google.golang.org/grpc v1.74.0
+	google.golang.org/api v0.243.0
+	google.golang.org/grpc v1.74.2
 )
 
 replace github.com/roadrunner-server/google-pub-sub/v5 => ../
