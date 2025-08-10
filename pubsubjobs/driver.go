@@ -413,7 +413,7 @@ func (d *Driver) manageSubscriptions() error {
 		DeadLetterPolicy:   initOrNil(dltopic, d.maxDeliveryAttempts),
 	}
 
-	_, err = d.gclient.SubscriptionAdminClient.CreateSubscription(ctx, sub, nil)
+	_, err = d.gclient.SubscriptionAdminClient.CreateSubscription(ctx, sub)
 	if err != nil {
 		if !strings.Contains(err.Error(), "already exists") {
 			return err
