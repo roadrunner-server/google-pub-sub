@@ -5,7 +5,7 @@ go 1.24
 toolchain go1.24.0
 
 require (
-	cloud.google.com/go/pubsub v1.49.0
+	cloud.google.com/go/pubsub v1.50.0
 	github.com/goccy/go-json v0.10.5
 	github.com/roadrunner-server/api/v4 v4.21.0
 	github.com/roadrunner-server/endure/v2 v2.6.2
@@ -26,6 +26,7 @@ require (
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.7.0 // indirect
 	cloud.google.com/go/iam v1.5.2 // indirect
+	cloud.google.com/go/pubsub/v2 v2.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
