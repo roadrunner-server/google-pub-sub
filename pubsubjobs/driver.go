@@ -364,7 +364,7 @@ func (d *Driver) manageSubscriptions() error {
 	var err error
 	// Create regular topic
 	topicpb := &pubsubpb.Topic{
-		Name: d.topicStr,
+		Name: fmt.Sprintf("projects/%s/topics/%s", d.gclient.Project(), d.topicStr),
 	}
 
 	topic, err := d.gclient.TopicAdminClient.CreateTopic(ctx, topicpb)
@@ -407,7 +407,7 @@ func (d *Driver) manageSubscriptions() error {
 
 	// Create subscription but not listen it
 	sub := &pubsubpb.Subscription{
-		Name:               d.subStr,
+		Name:               fmt.Sprintf("projects/%s/subscriptions/%s", d.gclient.Project(), d.subStr),
 		Topic:              topic.String(),
 		AckDeadlineSeconds: 480, // 8 minutes
 		DeadLetterPolicy:   initOrNil(dltopic, d.maxDeliveryAttempts),
