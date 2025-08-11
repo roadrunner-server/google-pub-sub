@@ -2,13 +2,15 @@ package pubsubjobs
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"cloud.google.com/go/pubsub"
+	"cloud.google.com/go/pubsub/v2"
+	pubsubpb "cloud.google.com/go/pubsub/v2/apiv1/pubsubpb"
 	"github.com/goccy/go-json"
 	"github.com/roadrunner-server/api/v4/plugins/v4/jobs"
 	"github.com/roadrunner-server/errors"
@@ -53,8 +55,6 @@ type Driver struct {
 	id       string
 
 	// pubsub specific
-	gsub                *pubsub.Subscription
-	gtopic              *pubsub.Topic
 	gclient             *pubsub.Client
 	topicStr            string
 	dltopicStr          string
@@ -297,8 +297,6 @@ func (d *Driver) Pause(ctx context.Context, p string) error {
 	}
 
 	d.log.Debug("stop listening for messages", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start))
-	// stop the listener
-	d.gtopic.Stop()
 
 	atomic.AddUint32(&d.listeners, ^uint32(0))
 
@@ -350,8 +348,6 @@ func (d *Driver) Stop(ctx context.Context) error {
 
 	d.checkCtxAndCancel()
 
-	d.gtopic.Stop()
-
 	err := d.gclient.Close()
 	if err != nil {
 		d.log.Error("failed to close the client", zap.Error(err))
@@ -367,62 +363,73 @@ func (d *Driver) manageSubscriptions() error {
 
 	var err error
 	// Create regular topic
-	d.gtopic, err = d.gclient.CreateTopic(ctx, d.topicStr)
+	topicpb := &pubsubpb.Topic{
+		Name: fmt.Sprintf("projects/%s/topics/%s", d.gclient.Project(), d.topicStr),
+	}
+
+	topic, err := d.gclient.TopicAdminClient.CreateTopic(ctx, topicpb)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Topic already exists") {
 			return err
 		}
 
 		// topic would be nil if it already exists
-		d.gtopic = d.gclient.Topic(d.topicStr)
+		topic, err = d.gclient.TopicAdminClient.GetTopic(ctx, &pubsubpb.GetTopicRequest{Topic: d.topicStr})
+		if err != nil {
+			return err
+		}
 	}
 
-	d.log.Debug("created/used topic", zap.String("topic", d.gtopic.String()))
+	d.log.Debug("created/used topic", zap.String("topic", topic.String()))
 
 	// check or create a Dead Letter Topic
-	var dltopic *pubsub.Topic
-
+	var dltopic *pubsubpb.Topic
 	if d.dltopicStr != "" {
-		dltopic, err = d.gclient.CreateTopic(ctx, d.dltopicStr)
+		dltopicpb := &pubsubpb.Topic{
+			Name: fmt.Sprintf("projects/%s/topics/%s", d.gclient.Project(), d.dltopicStr),
+		}
+		dltopic, err = d.gclient.TopicAdminClient.CreateTopic(ctx, dltopicpb)
 		if err != nil {
 			if !strings.Contains(err.Error(), "already exists") {
 				return err
 			}
 
 			// topic would be nil if it already exists
-			dltopic = d.gclient.Topic(d.dltopicStr)
+			dltopic, err = d.gclient.TopicAdminClient.GetTopic(ctx, &pubsubpb.GetTopicRequest{Topic: dltopicpb.Name})
+			if err != nil {
+				return err
+			}
 		}
 
 		d.log.Debug("created/used dead letter topic", zap.String("topic", dltopic.String()))
 	}
 
 	// Create subscription but not listen it
-	d.gsub, err = d.gclient.CreateSubscription(ctx, d.subStr, pubsub.SubscriptionConfig{
-		Topic: d.gtopic,
-		// Ack dedline should be between 10 seconds and 10 minutes
-		AckDeadline:      time.Minute * 8,
-		DeadLetterPolicy: initOrNil(dltopic, d.maxDeliveryAttempts),
+	_, err = d.gclient.SubscriptionAdminClient.CreateSubscription(ctx, &pubsubpb.Subscription{
+		Name:               fmt.Sprintf("projects/%s/subscriptions/%s", d.gclient.Project(), d.subStr),
+		Topic:              fmt.Sprintf("projects/%s/topics/%s", d.gclient.Project(), d.topicStr),
+		AckDeadlineSeconds: 480, // 8 minutes
+		DeadLetterPolicy:   initOrNil(dltopic, d.maxDeliveryAttempts),
 	})
-
 	if err != nil {
 		if !strings.Contains(err.Error(), "already exists") {
 			return err
 		}
 	}
 
-	d.log.Debug("created subscription, not listening", zap.String("topic", d.topicStr), zap.String("subscription", d.subStr))
+	d.log.Debug("created subscription, not listening", zap.String("topic", topic.String()), zap.String("subscription", d.subStr))
 
 	return nil
 }
 
-func initOrNil(deadLetterTopic *pubsub.Topic, maxDeliveryAttempts int) *pubsub.DeadLetterPolicy {
-	if deadLetterTopic == nil || deadLetterTopic.String() == "" {
+func initOrNil(deadLetterTopic *pubsubpb.Topic, maxDeliveryAttempts int) *pubsubpb.DeadLetterPolicy {
+	if deadLetterTopic == nil || deadLetterTopic.Name == "" {
 		return nil
 	}
 
-	return &pubsub.DeadLetterPolicy{
-		DeadLetterTopic:     deadLetterTopic.String(),
-		MaxDeliveryAttempts: maxDeliveryAttempts,
+	return &pubsubpb.DeadLetterPolicy{
+		DeadLetterTopic:     deadLetterTopic.Name,
+		MaxDeliveryAttempts: int32(maxDeliveryAttempts), //nolint:gosec
 	}
 }
 
@@ -432,7 +439,7 @@ func (d *Driver) handlePush(ctx context.Context, job *Item) error {
 		return err
 	}
 
-	result := d.gtopic.Publish(ctx, &pubsub.Message{
+	result := d.gclient.Publisher(d.topicStr).Publish(ctx, &pubsub.Message{
 		Data: job.Payload,
 		Attributes: map[string]string{
 			jobs.RRID:       job.Ident,

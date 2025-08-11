@@ -35,9 +35,8 @@ func TestInit(t *testing.T) {
 	cont := endure.New(slog.LevelDebug)
 
 	cfg := &config.Plugin{
-		Version: "2023.3.0",
+		Version: "2025.1.2",
 		Path:    "configs/.rr-init.yaml",
-		Prefix:  "rr",
 	}
 
 	err = cont.RegisterAll(
@@ -117,9 +116,8 @@ func TestDeclare(t *testing.T) {
 	cont := endure.New(slog.LevelDebug)
 
 	cfg := &config.Plugin{
-		Version: "2023.3.0",
+		Version: "2025.1.0",
 		Path:    "configs/.rr-declare.yaml",
-		Prefix:  "rr",
 	}
 
 	err = cont.RegisterAll(

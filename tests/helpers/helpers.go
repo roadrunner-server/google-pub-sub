@@ -2,19 +2,22 @@ package helpers
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net"
 	"net/rpc"
-	"strings"
 	"testing"
 	"time"
 
-	"cloud.google.com/go/pubsub"
+	"cloud.google.com/go/pubsub/v2"
+	"cloud.google.com/go/pubsub/v2/apiv1/pubsubpb"
 	"github.com/google/uuid"
 	jobsProto "github.com/roadrunner-server/api/v4/build/jobs/v1"
 	jobState "github.com/roadrunner-server/api/v4/plugins/v1/jobs"
 	goridgeRpc "github.com/roadrunner-server/goridge/v3/pkg/rpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	otherit "google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -148,14 +151,16 @@ func DeclarePipe(topic string, address string, pipeline string) func(t *testing.
 		assert.NoError(t, err)
 		client := rpc.NewClientWithCodec(goridgeRpc.NewClientCodec(conn))
 
-		pipe := &jobsProto.DeclareRequest{Pipeline: map[string]string{
-			"driver":            "google_pub_sub",
-			"name":              pipeline,
-			"priority":          "3",
-			"topic":             topic,
-			"dead_letter_topic": "dead_letter_topic",
-			"project_id":        "test",
-		}}
+		pipe := &jobsProto.DeclareRequest{
+			Pipeline: map[string]string{
+				"driver":            "google_pub_sub",
+				"name":              pipeline,
+				"priority":          "3",
+				"topic":             topic,
+				"dead_letter_topic": "dead_letter_topic",
+				"project_id":        "test",
+			},
+		}
 
 		er := &jobsProto.Empty{}
 		err = client.Call("jobs.Declare", pipe, er)
@@ -173,36 +178,50 @@ func CleanEmulator() error {
 	if err != nil {
 		return err
 	}
+	defer client.Close()
 
+	ls := pubsubpb.ListSubscriptionsRequest{
+		Project: fmt.Sprintf("projects/%s", client.Project()),
+	}
+
+	subiter := client.SubscriptionAdminClient.ListSubscriptions(ctx, &ls)
 	for {
-		sub, err := client.Subscriptions(ctx).Next()
+		sub, err := subiter.Next()
 		if err != nil {
-			if strings.Contains(err.Error(), "no more items in iterator") {
+			if errors.Is(err, otherit.Done) {
 				break
 			}
-
 			return err
 		}
+		subr := pubsubpb.DeleteSubscriptionRequest{
+			Subscription: sub.GetName(),
+		}
 
-		err = sub.Delete(ctx)
-		if err != nil {
+		if err := client.SubscriptionAdminClient.DeleteSubscription(ctx, &subr); err != nil {
 			return err
 		}
 	}
+
+	titer := client.TopicAdminClient.ListTopics(ctx, &pubsubpb.ListTopicsRequest{
+		Project: fmt.Sprintf("projects/%s", client.Project()),
+	})
 
 	for {
-		topic, err := client.Topics(ctx).Next()
+		topic, err := titer.Next()
 		if err != nil {
-			if strings.Contains(err.Error(), "no more items in iterator") {
-				return nil
+			if errors.Is(err, otherit.Done) {
+				break
 			}
-
 			return err
 		}
 
-		err = topic.Delete(ctx)
+		err = client.TopicAdminClient.DeleteTopic(ctx, &pubsubpb.DeleteTopicRequest{
+			Topic: topic.GetName(),
+		})
 		if err != nil {
 			return err
 		}
 	}
+
+	return nil
 }

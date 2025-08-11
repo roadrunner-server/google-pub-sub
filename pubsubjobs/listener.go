@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync/atomic"
 
-	"cloud.google.com/go/pubsub"
+	"cloud.google.com/go/pubsub/v2"
 	"github.com/roadrunner-server/events"
 	"go.opentelemetry.io/otel/propagation"
 	"go.uber.org/zap"
@@ -20,7 +20,7 @@ func (d *Driver) listen() {
 	// context used to stop the listener
 	d.atomicCtx()
 	go func() {
-		err := d.gsub.Receive(d.rctx, func(ctx context.Context, message *pubsub.Message) {
+		err := d.gclient.Subscriber(d.subStr).Receive(d.rctx, func(ctx context.Context, message *pubsub.Message) {
 			if message == nil {
 				d.log.Warn("received nil message, skipping processing the message")
 				return

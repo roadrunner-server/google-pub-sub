@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"cloud.google.com/go/pubsub"
+	"cloud.google.com/go/pubsub/v2"
 	"github.com/goccy/go-json"
 	"go.uber.org/zap"
 
