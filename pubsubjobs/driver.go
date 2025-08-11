@@ -384,7 +384,6 @@ func (d *Driver) manageSubscriptions() error {
 
 	// check or create a Dead Letter Topic
 	var dltopic *pubsubpb.Topic
-
 	if d.dltopicStr != "" {
 		dltopicpb := &pubsubpb.Topic{
 			Name: fmt.Sprintf("projects/%s/topics/%s", d.gclient.Project(), d.dltopicStr),
@@ -406,14 +405,12 @@ func (d *Driver) manageSubscriptions() error {
 	}
 
 	// Create subscription but not listen it
-	sub := &pubsubpb.Subscription{
+	_, err = d.gclient.SubscriptionAdminClient.CreateSubscription(ctx, &pubsubpb.Subscription{
 		Name:               fmt.Sprintf("projects/%s/subscriptions/%s", d.gclient.Project(), d.subStr),
-		Topic:              topic.String(),
+		Topic:              fmt.Sprintf("projects/%s/topics/%s", d.gclient.Project(), d.topicStr),
 		AckDeadlineSeconds: 480, // 8 minutes
 		DeadLetterPolicy:   initOrNil(dltopic, d.maxDeliveryAttempts),
-	}
-
-	_, err = d.gclient.SubscriptionAdminClient.CreateSubscription(ctx, sub)
+	})
 	if err != nil {
 		if !strings.Contains(err.Error(), "already exists") {
 			return err
@@ -426,12 +423,12 @@ func (d *Driver) manageSubscriptions() error {
 }
 
 func initOrNil(deadLetterTopic *pubsubpb.Topic, maxDeliveryAttempts int) *pubsubpb.DeadLetterPolicy {
-	if deadLetterTopic == nil || deadLetterTopic.String() == "" {
+	if deadLetterTopic == nil || deadLetterTopic.Name == "" {
 		return nil
 	}
 
 	return &pubsubpb.DeadLetterPolicy{
-		DeadLetterTopic:     deadLetterTopic.String(),
+		DeadLetterTopic:     deadLetterTopic.Name,
 		MaxDeliveryAttempts: int32(maxDeliveryAttempts), //nolint:gosec
 	}
 }

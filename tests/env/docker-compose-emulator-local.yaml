@@ -1,6 +1,7 @@
 services:
   pub-sub-emulator:
     image: google/cloud-sdk:latest
+    platform: linux/amd64
     command: ["gcloud", "beta", "emulators", "pubsub", "start", "--host-port=0.0.0.0:8085", "--project=test"]
     ports:
       - "0.0.0.0:8085:8085"
