@@ -1,13 +1,13 @@
 module tests
 
-go 1.24.5
+go 1.25
 
-toolchain go1.24.6
+toolchain go1.25.0
 
 require (
 	cloud.google.com/go/pubsub/v2 v2.0.0
 	github.com/google/uuid v1.6.0
-	github.com/roadrunner-server/api/v4 v4.21.0
+	github.com/roadrunner-server/api/v4 v4.22.1
 	github.com/roadrunner-server/config/v5 v5.1.8
 	github.com/roadrunner-server/endure/v2 v2.6.2
 	github.com/roadrunner-server/google-pub-sub/v5 v5.1.8
@@ -20,15 +20,15 @@ require (
 	github.com/roadrunner-server/server/v5 v5.2.9
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.27.0
-	google.golang.org/api v0.246.0
+	google.golang.org/api v0.247.0
 	google.golang.org/grpc v1.74.2
 )
 
 replace github.com/roadrunner-server/google-pub-sub/v5 => ../
 
 require (
-	cloud.google.com/go v0.121.4 // indirect
-	cloud.google.com/go/auth v0.16.4 // indirect
+	cloud.google.com/go v0.121.6 // indirect
+	cloud.google.com/go/auth v0.16.5 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.8.0 // indirect
 	cloud.google.com/go/iam v1.5.2 // indirect
@@ -91,9 +91,9 @@ require (
 	golang.org/x/sys v0.35.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
-	google.golang.org/genproto v0.0.0-20250804133106-a7a43d27e69b // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20250804133106-a7a43d27e69b // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250804133106-a7a43d27e69b // indirect
+	google.golang.org/genproto v0.0.0-20250811230008-5f3141c8851a // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20250811230008-5f3141c8851a // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250811230008-5f3141c8851a // indirect
 	google.golang.org/protobuf v1.36.7 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
