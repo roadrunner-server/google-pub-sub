@@ -2,7 +2,7 @@ module github.com/roadrunner-server/google-pub-sub/v5
 
 go 1.25
 
-toolchain go1.25.1
+toolchain go1.25.2
 
 require (
 	cloud.google.com/go/pubsub/v2 v2.2.0
@@ -16,8 +16,8 @@ require (
 	go.opentelemetry.io/otel/sdk v1.38.0
 	go.opentelemetry.io/otel/trace v1.38.0
 	go.uber.org/zap v1.27.0
-	google.golang.org/api v0.251.0
-	google.golang.org/grpc v1.75.1
+	google.golang.org/api v0.252.0
+	google.golang.org/grpc v1.76.0
 )
 
 require (
@@ -43,14 +43,14 @@ require (
 	go.opentelemetry.io/otel/metric v1.38.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.42.0 // indirect
-	golang.org/x/net v0.44.0 // indirect
+	golang.org/x/net v0.45.0 // indirect
 	golang.org/x/oauth2 v0.31.0 // indirect
 	golang.org/x/sync v0.17.0 // indirect
 	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/text v0.29.0 // indirect
 	golang.org/x/time v0.13.0 // indirect
-	google.golang.org/genproto v0.0.0-20251002232023-7c0ddcbb5797 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20251002232023-7c0ddcbb5797 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20251002232023-7c0ddcbb5797 // indirect
+	google.golang.org/genproto v0.0.0-20251006185510-65f7160b3a87 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20251006185510-65f7160b3a87 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251006185510-65f7160b3a87 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 )
