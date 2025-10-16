@@ -2,10 +2,10 @@ module tests
 
 go 1.25
 
-toolchain go1.25.2
+toolchain go1.25.3
 
 require (
-	cloud.google.com/go/pubsub/v2 v2.2.0
+	cloud.google.com/go/pubsub/v2 v2.2.1
 	github.com/google/uuid v1.6.0
 	github.com/roadrunner-server/api/v4 v4.22.1
 	github.com/roadrunner-server/config/v5 v5.1.9
@@ -92,9 +92,9 @@ require (
 	golang.org/x/sys v0.37.0 // indirect
 	golang.org/x/text v0.30.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
-	google.golang.org/genproto v0.0.0-20251007200510-49b9836ed3ff // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20251007200510-49b9836ed3ff // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20251007200510-49b9836ed3ff // indirect
+	google.golang.org/genproto v0.0.0-20251014184007-4626949a642f // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20251014184007-4626949a642f // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251014184007-4626949a642f // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
