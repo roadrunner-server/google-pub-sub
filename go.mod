@@ -2,10 +2,10 @@ module github.com/roadrunner-server/google-pub-sub/v5
 
 go 1.25
 
-toolchain go1.25.6
+toolchain go1.25.7
 
 require (
-	cloud.google.com/go/pubsub/v2 v2.3.0
+	cloud.google.com/go/pubsub/v2 v2.4.0
 	github.com/goccy/go-json v0.10.5
 	github.com/roadrunner-server/api/v4 v4.23.0
 	github.com/roadrunner-server/endure/v2 v2.6.2
@@ -16,7 +16,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.40.0
 	go.opentelemetry.io/otel/trace v1.40.0
 	go.uber.org/zap v1.27.1
-	google.golang.org/api v0.264.0
+	google.golang.org/api v0.265.0
 	google.golang.org/grpc v1.78.0
 )
 
@@ -45,9 +45,9 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.47.0 // indirect
 	golang.org/x/net v0.49.0 // indirect
-	golang.org/x/oauth2 v0.34.0 // indirect
+	golang.org/x/oauth2 v0.35.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/genproto v0.0.0-20260203192932-546029d2fa20 // indirect
