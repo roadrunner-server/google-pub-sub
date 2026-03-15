@@ -12,7 +12,7 @@ import (
 	"cloud.google.com/go/pubsub/v2"
 	pubsubpb "cloud.google.com/go/pubsub/v2/apiv1/pubsubpb"
 	"github.com/goccy/go-json"
-	"github.com/roadrunner-server/api/v4/plugins/v4/jobs"
+	"github.com/roadrunner-server/api-plugins/v6/jobs"
 	"github.com/roadrunner-server/errors"
 	"github.com/roadrunner-server/events"
 	jprop "go.opentelemetry.io/contrib/propagators/jaeger"
@@ -71,7 +71,7 @@ type Driver struct {
 }
 
 // FromConfig initializes google_pub_sub_driver_ pipeline
-func FromConfig(tracer *sdktrace.TracerProvider, configKey string, pipe jobs.Pipeline, log *zap.Logger, cfg Configurer, pq jobs.Queue) (*Driver, error) {
+func FromConfig(ctx context.Context, tracer *sdktrace.TracerProvider, configKey string, log *zap.Logger, cfg Configurer, pipe jobs.Pipeline, pq jobs.Queue) (*Driver, error) {
 	const op = errors.Op("google_pub_sub_consumer")
 
 	if tracer == nil {
@@ -117,7 +117,7 @@ func FromConfig(tracer *sdktrace.TracerProvider, configKey string, pipe jobs.Pip
 
 	opts = append(opts, option.WithEndpoint(conf.Endpoint))
 
-	gclient, err := pubsub.NewClient(context.Background(), conf.ProjectID, opts...)
+	gclient, err := pubsub.NewClient(ctx, conf.ProjectID, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +153,7 @@ func FromConfig(tracer *sdktrace.TracerProvider, configKey string, pipe jobs.Pip
 }
 
 // FromPipeline initializes consumer from pipeline
-func FromPipeline(tracer *sdktrace.TracerProvider, pipe jobs.Pipeline, log *zap.Logger, cfg Configurer, pq jobs.Queue) (*Driver, error) {
+func FromPipeline(ctx context.Context, tracer *sdktrace.TracerProvider, pipe jobs.Pipeline, log *zap.Logger, cfg Configurer, pq jobs.Queue) (*Driver, error) {
 	const op = errors.Op("google_pub_sub_consumer_from_pipeline")
 	if tracer == nil {
 		tracer = sdktrace.NewTracerProvider()
@@ -195,7 +195,7 @@ func FromPipeline(tracer *sdktrace.TracerProvider, pipe jobs.Pipeline, log *zap.
 	opts = append(opts, option.WithEndpoint(conf.Endpoint))
 
 	// PARSE CONFIGURATION END -------
-	gclient, err := pubsub.NewClient(context.Background(), conf.ProjectID, opts...)
+	gclient, err := pubsub.NewClient(ctx, conf.ProjectID, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -204,13 +204,15 @@ func FromPipeline(tracer *sdktrace.TracerProvider, pipe jobs.Pipeline, log *zap.
 	eventBus, id := events.NewEventBus()
 
 	jb := &Driver{
-		prop:     prop,
-		tracer:   tracer,
-		log:      log,
-		pq:       pq,
-		topicStr: conf.Topic,
-		subStr:   pipe.Name(),
-		gclient:  gclient,
+		prop:                prop,
+		tracer:              tracer,
+		log:                 log,
+		pq:                  pq,
+		topicStr:            conf.Topic,
+		dltopicStr:          conf.DeadLetterTopic,
+		maxDeliveryAttempts: conf.MaxDeliveryAttempts,
+		subStr:              pipe.Name(),
+		gclient:             gclient,
 
 		// events
 		eventsCh: eventsCh,

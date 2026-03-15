@@ -14,9 +14,9 @@ import (
 
 	"github.com/roadrunner-server/config/v5"
 	"github.com/roadrunner-server/endure/v2"
-	googlePubSub "github.com/roadrunner-server/google-pub-sub/v5"
+	googlePubSub "github.com/roadrunner-server/google-pub-sub/v6"
 	"github.com/roadrunner-server/informer/v5"
-	"github.com/roadrunner-server/jobs/v5"
+	"github.com/roadrunner-server/jobs/v6"
 	"github.com/roadrunner-server/logger/v5"
 	"github.com/roadrunner-server/resetter/v5"
 	rpcPlugin "github.com/roadrunner-server/rpc/v5"
@@ -446,7 +446,7 @@ func TestRemovePQ(t *testing.T) {
 
 	time.Sleep(time.Second * 3)
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		t.Run("PushPipeline", helpers.PushToPipe("test-3", false, "127.0.0.1:6601"))
 		t.Run("PushPipeline", helpers.PushToPipe("test-4", false, "127.0.0.1:6601"))
 	}

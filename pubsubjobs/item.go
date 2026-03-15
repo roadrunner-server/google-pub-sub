@@ -13,7 +13,7 @@ import (
 	"github.com/goccy/go-json"
 	"go.uber.org/zap"
 
-	"github.com/roadrunner-server/api/v4/plugins/v4/jobs"
+	"github.com/roadrunner-server/api-plugins/v6/jobs"
 	"github.com/roadrunner-server/errors"
 )
 

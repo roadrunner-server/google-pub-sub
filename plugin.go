@@ -1,13 +1,17 @@
 package googlepubsub
 
 import (
-	"github.com/roadrunner-server/api/v4/plugins/v4/jobs"
+	"context"
+
+	"github.com/roadrunner-server/api-plugins/v6/jobs"
 	"github.com/roadrunner-server/endure/v2/dep"
 	"github.com/roadrunner-server/errors"
-	"github.com/roadrunner-server/google-pub-sub/v5/pubsubjobs"
+	"github.com/roadrunner-server/google-pub-sub/v6/pubsubjobs"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.uber.org/zap"
 )
+
+var _ jobs.Constructor = (*Plugin)(nil)
 
 const (
 	pluginName       string = "google_pub_sub"
@@ -58,10 +62,10 @@ func (p *Plugin) Collects() []*dep.In {
 	}
 }
 
-func (p *Plugin) DriverFromConfig(configKey string, pq jobs.Queue, pipeline jobs.Pipeline) (jobs.Driver, error) {
-	return pubsubjobs.FromConfig(p.tracer, configKey, pipeline, p.log, p.cfg, pq)
+func (p *Plugin) DriverFromConfig(ctx context.Context, configKey string, pq jobs.Queue, pipeline jobs.Pipeline) (jobs.Driver, error) {
+	return pubsubjobs.FromConfig(ctx, p.tracer, configKey, p.log, p.cfg, pipeline, pq)
 }
 
-func (p *Plugin) DriverFromPipeline(pipe jobs.Pipeline, pq jobs.Queue) (jobs.Driver, error) {
-	return pubsubjobs.FromPipeline(p.tracer, pipe, p.log, p.cfg, pq)
+func (p *Plugin) DriverFromPipeline(ctx context.Context, pipe jobs.Pipeline, pq jobs.Queue) (jobs.Driver, error) {
+	return pubsubjobs.FromPipeline(ctx, p.tracer, pipe, p.log, p.cfg, pq)
 }
