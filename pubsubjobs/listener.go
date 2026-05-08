@@ -8,7 +8,6 @@ import (
 	"cloud.google.com/go/pubsub/v2"
 	"github.com/roadrunner-server/events"
 	"go.opentelemetry.io/otel/propagation"
-	"go.uber.org/zap"
 	"google.golang.org/grpc/status"
 )
 
@@ -26,10 +25,10 @@ func (d *Driver) listen() {
 				return
 			}
 
-			d.log.Debug("receive message", zap.Stringp("ID", &message.ID))
+			d.log.Debug("receive message", "ID", &message.ID)
 
 			if message.DeliveryAttempt != nil {
-				d.log.Info("message delivery attempts", zap.Int("attempts", *message.DeliveryAttempt))
+				d.log.Info("message delivery attempts", "attempts", *message.DeliveryAttempt)
 			}
 
 			item := d.unpack(message)
@@ -47,7 +46,7 @@ func (d *Driver) listen() {
 			d.prop.Inject(ctxspan, propagation.HeaderCarrier(item.headers))
 
 			d.pq.Insert(item)
-			d.log.Debug("message pushed to the priority queue", zap.Uint64("queue size", d.pq.Len()))
+			d.log.Debug("message pushed to the priority queue", "queue size", d.pq.Len())
 
 			span.End()
 		})
@@ -76,7 +75,7 @@ func (d *Driver) listen() {
 			// recreate pipeline on fail
 			pipe := (*d.pipeline.Load()).Name()
 			d.eventsCh <- events.NewEvent(events.EventJOBSDriverCommand, pipe, restartStr)
-			d.log.Error("subscribing error, restarting the pipeline", zap.Error(err), zap.String("pipeline", pipe))
+			d.log.Error("subscribing error, restarting the pipeline", "error", err, "pipeline", pipe)
 		}
 	}()
 }

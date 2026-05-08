@@ -3,6 +3,7 @@ package pubsubjobs
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,7 +21,6 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
-	"go.uber.org/zap"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -43,7 +43,7 @@ type Configurer interface {
 type Driver struct {
 	mu sync.Mutex
 
-	log      *zap.Logger
+	log      *slog.Logger
 	pq       jobs.Queue
 	pipeline atomic.Pointer[jobs.Pipeline]
 	tracer   *sdktrace.TracerProvider
@@ -71,7 +71,7 @@ type Driver struct {
 }
 
 // FromConfig initializes google_pub_sub_driver_ pipeline
-func FromConfig(ctx context.Context, tracer *sdktrace.TracerProvider, configKey string, log *zap.Logger, cfg Configurer, pipe jobs.Pipeline, pq jobs.Queue) (*Driver, error) {
+func FromConfig(ctx context.Context, tracer *sdktrace.TracerProvider, configKey string, log *slog.Logger, cfg Configurer, pipe jobs.Pipeline, pq jobs.Queue) (*Driver, error) {
 	const op = errors.Op("google_pub_sub_consumer")
 
 	if tracer == nil {
@@ -153,7 +153,7 @@ func FromConfig(ctx context.Context, tracer *sdktrace.TracerProvider, configKey 
 }
 
 // FromPipeline initializes consumer from pipeline
-func FromPipeline(ctx context.Context, tracer *sdktrace.TracerProvider, pipe jobs.Pipeline, log *zap.Logger, cfg Configurer, pq jobs.Queue) (*Driver, error) {
+func FromPipeline(ctx context.Context, tracer *sdktrace.TracerProvider, pipe jobs.Pipeline, log *slog.Logger, cfg Configurer, pq jobs.Queue) (*Driver, error) {
 	const op = errors.Op("google_pub_sub_consumer_from_pipeline")
 	if tracer == nil {
 		tracer = sdktrace.NewTracerProvider()
@@ -263,11 +263,11 @@ func (d *Driver) Run(ctx context.Context, p jobs.Pipeline) error {
 
 	atomic.AddUint32(&d.listeners, 1)
 
-	d.log.Debug("start listening for messages", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start))
+	d.log.Debug("start listening for messages", "driver", pipe.Driver(), "pipeline", pipe.Name(), "start", start)
 
 	d.listen()
 
-	d.log.Debug("pipeline was started", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
+	d.log.Debug("pipeline was started", "driver", pipe.Driver(), "pipeline", pipe.Name(), "start", start, "elapsed", time.Since(start))
 	return nil
 }
 
@@ -298,11 +298,11 @@ func (d *Driver) Pause(ctx context.Context, p string) error {
 		return errors.Str("no active listeners, nothing to pause")
 	}
 
-	d.log.Debug("stop listening for messages", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start))
+	d.log.Debug("stop listening for messages", "driver", pipe.Driver(), "pipeline", pipe.Name(), "start", start)
 
 	atomic.AddUint32(&d.listeners, ^uint32(0))
 
-	d.log.Debug("pipeline was paused", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", time.Now().UTC()), zap.Duration("elapsed", time.Since(start)))
+	d.log.Debug("pipeline was paused", "driver", pipe.Driver(), "pipeline", pipe.Name(), "start", time.Now().UTC(), "elapsed", time.Since(start))
 
 	return nil
 }
@@ -328,12 +328,12 @@ func (d *Driver) Resume(ctx context.Context, p string) error {
 		return errors.Str("listener is already in the active state")
 	}
 
-	d.log.Debug("resume listening for messages", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start))
+	d.log.Debug("resume listening for messages", "driver", pipe.Driver(), "pipeline", pipe.Name(), "start", start)
 	d.listen()
 
 	// increase num of listeners
 	atomic.AddUint32(&d.listeners, 1)
-	d.log.Debug("pipeline was resumed", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", time.Now().UTC()), zap.Duration("elapsed", time.Since(start)))
+	d.log.Debug("pipeline was resumed", "driver", pipe.Driver(), "pipeline", pipe.Name(), "start", time.Now().UTC(), "elapsed", time.Since(start))
 
 	return nil
 }
@@ -352,10 +352,10 @@ func (d *Driver) Stop(ctx context.Context) error {
 
 	err := d.gclient.Close()
 	if err != nil {
-		d.log.Error("failed to close the client", zap.Error(err))
+		d.log.Error("failed to close the client", "error", err)
 	}
 
-	d.log.Debug("pipeline was stopped", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", time.Now().UTC()), zap.Duration("elapsed", time.Since(start)))
+	d.log.Debug("pipeline was stopped", "driver", pipe.Driver(), "pipeline", pipe.Name(), "start", time.Now().UTC(), "elapsed", time.Since(start))
 	return nil
 }
 
@@ -382,7 +382,7 @@ func (d *Driver) manageSubscriptions() error {
 		}
 	}
 
-	d.log.Debug("created/used topic", zap.String("topic", topic.String()))
+	d.log.Debug("created/used topic", "topic", topic.String())
 
 	// check or create a Dead Letter Topic
 	var dltopic *pubsubpb.Topic
@@ -403,7 +403,7 @@ func (d *Driver) manageSubscriptions() error {
 			}
 		}
 
-		d.log.Debug("created/used dead letter topic", zap.String("topic", dltopic.String()))
+		d.log.Debug("created/used dead letter topic", "topic", dltopic.String())
 	}
 
 	// Create subscription but not listen it
@@ -419,7 +419,7 @@ func (d *Driver) manageSubscriptions() error {
 		}
 	}
 
-	d.log.Debug("created subscription, not listening", zap.String("topic", topic.String()), zap.String("subscription", d.subStr))
+	d.log.Debug("created subscription, not listening", "topic", topic.String(), "subscription", d.subStr)
 
 	return nil
 }
@@ -459,7 +459,7 @@ func (d *Driver) handlePush(ctx context.Context, job *Item) error {
 		return err
 	}
 
-	d.log.Debug("Message published", zap.String("messageId", id))
+	d.log.Debug("Message published", "messageId", id)
 
 	return nil
 }

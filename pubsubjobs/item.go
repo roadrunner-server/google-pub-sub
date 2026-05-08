@@ -11,7 +11,6 @@ import (
 
 	"cloud.google.com/go/pubsub/v2"
 	"github.com/goccy/go-json"
-	"go.uber.org/zap"
 
 	"github.com/roadrunner-server/api-plugins/v6/jobs"
 	"github.com/roadrunner-server/errors"
@@ -245,7 +244,7 @@ func (d *Driver) unpack(message *pubsub.Message) *Item {
 	if val, ok := attributes[jobs.RRHeaders]; ok {
 		err := json.Unmarshal([]byte(val), &h)
 		if err != nil {
-			d.log.Debug("failed to unpack the headers, not a JSON", zap.Error(err))
+			d.log.Debug("failed to unpack the headers, not a JSON", "error", err)
 		}
 	}
 
@@ -259,7 +258,7 @@ func (d *Driver) unpack(message *pubsub.Message) *Item {
 	if val, ok := attributes[jobs.RRDelay]; ok {
 		dl, err = strconv.Atoi(val)
 		if err != nil {
-			d.log.Debug("failed to unpack the delay, not a number", zap.Error(err))
+			d.log.Debug("failed to unpack the delay, not a number", "error", err)
 		}
 	}
 
@@ -268,7 +267,7 @@ func (d *Driver) unpack(message *pubsub.Message) *Item {
 		priority, err = strconv.Atoi(val)
 		if err != nil {
 			priority = int((*d.pipeline.Load()).Priority())
-			d.log.Debug("failed to unpack the priority; inheriting the pipeline's default priority", zap.Error(err))
+			d.log.Debug("failed to unpack the priority; inheriting the pipeline's default priority", "error", err)
 		}
 	}
 

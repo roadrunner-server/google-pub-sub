@@ -2,13 +2,13 @@ package googlepubsub
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/roadrunner-server/api-plugins/v6/jobs"
 	"github.com/roadrunner-server/endure/v2/dep"
 	"github.com/roadrunner-server/errors"
 	"github.com/roadrunner-server/google-pub-sub/v6/pubsubjobs"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"go.uber.org/zap"
 )
 
 var _ jobs.Constructor = (*Plugin)(nil)
@@ -19,7 +19,7 @@ const (
 )
 
 type Plugin struct {
-	log    *zap.Logger
+	log    *slog.Logger
 	cfg    Configurer
 	tracer *sdktrace.TracerProvider
 }
@@ -32,7 +32,7 @@ type Configurer interface {
 }
 
 type Logger interface {
-	NamedLogger(name string) *zap.Logger
+	NamedLogger(name string) *slog.Logger
 }
 
 type Tracer interface {
