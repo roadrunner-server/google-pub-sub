@@ -9,9 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"tests/helpers"
-	mocklogger "tests/mock"
-
 	"github.com/roadrunner-server/config/v5"
 	"github.com/roadrunner-server/endure/v2"
 	googlePubSub "github.com/roadrunner-server/google-pub-sub/v6"
@@ -23,7 +20,8 @@ import (
 	"github.com/roadrunner-server/server/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
+	"tests/helpers"
+	mocklogger "tests/mock"
 )
 
 func TestInit(t *testing.T) {
@@ -206,7 +204,7 @@ func TestJobsError(t *testing.T) {
 		Prefix:  "rr",
 	}
 
-	l, oLogger := mocklogger.ZapTestLogger(zap.DebugLevel)
+	l, oLogger := mocklogger.SlogTestLogger(slog.LevelDebug)
 	err = cont.RegisterAll(
 		cfg,
 		&server.Plugin{},
@@ -302,7 +300,7 @@ func TestAutoAck(t *testing.T) {
 		Prefix:  "rr",
 	}
 
-	l, oLogger := mocklogger.ZapTestLogger(zap.DebugLevel)
+	l, oLogger := mocklogger.SlogTestLogger(slog.LevelDebug)
 	err = cont.RegisterAll(
 		cfg,
 		&server.Plugin{},
@@ -386,7 +384,7 @@ func TestRemovePQ(t *testing.T) {
 		Prefix:  "rr",
 	}
 
-	l, oLogger := mocklogger.ZapTestLogger(zap.DebugLevel)
+	l, oLogger := mocklogger.SlogTestLogger(slog.LevelDebug)
 	err = cont.RegisterAll(
 		cfg,
 		&server.Plugin{},

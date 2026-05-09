@@ -2,6 +2,7 @@ package pubsubjobs
 
 import (
 	"context"
+	"encoding/json"
 	stderr "errors"
 	"fmt"
 	"maps"
@@ -10,8 +11,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/pubsub/v2"
-	"github.com/goccy/go-json"
-
 	"github.com/roadrunner-server/api-plugins/v6/jobs"
 	"github.com/roadrunner-server/errors"
 )
