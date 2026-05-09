@@ -60,7 +60,6 @@ linters:
       - std-error-handling
     rules:
       - linters:
-          - dupl
           - funlen
           - gocognit
           - scopelint
