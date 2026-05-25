@@ -52,21 +52,21 @@ func (d *Driver) listen() {
 		})
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
-				atomic.StoreUint32(&d.listeners, 0)
+				d.listeners.Store(0)
 				return
 			}
 			st := status.Convert(err)
 			if st != nil && st.Message() == "grpc: the client connection is closing" {
 				// reduce the number of listeners
-				if atomic.LoadUint32(&d.listeners) > 0 {
-					atomic.AddUint32(&d.listeners, ^uint32(0))
+				if d.listeners.Load() > 0 {
+					d.listeners.Add(^uint32(0))
 				}
 
 				d.log.Debug("listener was stopped")
 				return
 			}
 
-			atomic.StoreUint32(&d.listeners, 0)
+			d.listeners.Store(0)
 			// the pipeline was stopped
 			if atomic.LoadUint64(&d.stopped) == 1 {
 				return
@@ -88,7 +88,7 @@ func (d *Driver) checkCtxAndCancel() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	if atomic.LoadUint32(&d.listeners) == 0 {
+	if d.listeners.Load() == 0 {
 		if d.receiveCtxCancel != nil {
 			d.receiveCtxCancel()
 		}

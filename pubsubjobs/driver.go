@@ -66,7 +66,7 @@ type Driver struct {
 	rctx             context.Context
 
 	// if a user invokes several resume operations
-	listeners uint32
+	listeners atomic.Uint32
 	stopped   uint64
 }
 
@@ -261,7 +261,7 @@ func (d *Driver) Run(ctx context.Context, p jobs.Pipeline) error {
 		return errors.E(op, errors.Errorf("no such pipeline registered: %s", pipe.Name()))
 	}
 
-	atomic.AddUint32(&d.listeners, 1)
+	d.listeners.Add(1)
 
 	d.log.Debug("start listening for messages", "driver", pipe.Driver(), "pipeline", pipe.Name(), "start", start)
 
@@ -292,7 +292,7 @@ func (d *Driver) Pause(ctx context.Context, p string) error {
 		return errors.Errorf("no such pipeline: %s", pipe.Name())
 	}
 
-	l := atomic.LoadUint32(&d.listeners)
+	l := d.listeners.Load()
 	// no active listeners
 	if l == 0 {
 		return errors.Str("no active listeners, nothing to pause")
@@ -300,7 +300,7 @@ func (d *Driver) Pause(ctx context.Context, p string) error {
 
 	d.log.Debug("stop listening for messages", "driver", pipe.Driver(), "pipeline", pipe.Name(), "start", start)
 
-	atomic.AddUint32(&d.listeners, ^uint32(0))
+	d.listeners.Add(^uint32(0))
 
 	d.log.Debug("pipeline was paused", "driver", pipe.Driver(), "pipeline", pipe.Name(), "start", time.Now().UTC(), "elapsed", time.Since(start))
 
@@ -322,7 +322,7 @@ func (d *Driver) Resume(ctx context.Context, p string) error {
 		return errors.Errorf("no such pipeline: %s", pipe.Name())
 	}
 
-	l := atomic.LoadUint32(&d.listeners)
+	l := d.listeners.Load()
 	// we have an active listener
 	if l == 1 {
 		return errors.Str("listener is already in the active state")
@@ -332,7 +332,7 @@ func (d *Driver) Resume(ctx context.Context, p string) error {
 	d.listen()
 
 	// increase num of listeners
-	atomic.AddUint32(&d.listeners, 1)
+	d.listeners.Add(1)
 	d.log.Debug("pipeline was resumed", "driver", pipe.Driver(), "pipeline", pipe.Name(), "start", time.Now().UTC(), "elapsed", time.Since(start))
 
 	return nil
