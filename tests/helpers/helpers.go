@@ -2,65 +2,61 @@ package helpers
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
-	"net/rpc"
+	"net/http"
+	"slices"
 	"testing"
 	"time"
 
 	"cloud.google.com/go/pubsub/v2"
 	"cloud.google.com/go/pubsub/v2/apiv1/pubsubpb"
+	"connectrpc.com/connect"
 	"github.com/google/uuid"
+	jobsProto "github.com/roadrunner-server/api-go/v6/jobs/v2"
+	"github.com/roadrunner-server/api-go/v6/jobs/v2/jobsV2connect"
 	jobState "github.com/roadrunner-server/api-plugins/v6/jobs"
-	jobsProto "github.com/roadrunner-server/api/v4/build/jobs/v1"
-	goridgeRpc "github.com/roadrunner-server/goridge/v4/pkg/rpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/net/http2"
 	otherit "google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-var dialer net.Dialer
+func newHTTPClient(t *testing.T) *http.Client {
+	t.Helper()
+	httpc := &http.Client{Transport: &http2.Transport{
+		AllowHTTP: true,
+		DialTLSContext: func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
+			return new(net.Dialer).DialContext(ctx, network, addr)
+		},
+	}}
+	t.Cleanup(httpc.CloseIdleConnections)
+	return httpc
+}
 
-const (
-	push    string = "jobs.Push"
-	pause   string = "jobs.Pause"
-	destroy string = "jobs.Destroy"
-	resume  string = "jobs.Resume"
-	stat    string = "jobs.Stat"
-)
+func NewJobsClient(t *testing.T, address string) jobsV2connect.JobsServiceClient {
+	t.Helper()
+	return jobsV2connect.NewJobsServiceClient(newHTTPClient(t), "http://"+address)
+}
 
 func ResumePipes(address string, pipes ...string) func(t *testing.T) {
 	return func(t *testing.T) {
-		conn, err := dialer.DialContext(context.Background(), "tcp", address)
-		require.NoError(t, err)
-		client := rpc.NewClientWithCodec(goridgeRpc.NewClientCodec(conn))
-
-		pipe := &jobsProto.Pipelines{Pipelines: make([]string, len(pipes))}
-
-		for i := range pipes {
-			pipe.GetPipelines()[i] = pipes[i]
-		}
-
-		er := &jobsProto.Empty{}
-		err = client.Call(resume, pipe, er)
+		client := NewJobsClient(t, address)
+		_, err := client.Resume(t.Context(), connect.NewRequest(&jobsProto.Pipelines{Pipelines: slices.Clone(pipes)}))
 		require.NoError(t, err)
 	}
 }
 
 func PushToPipe(pipeline string, autoAck bool, address string) func(t *testing.T) {
 	return func(t *testing.T) {
-		conn, err := dialer.DialContext(context.Background(), "tcp", address)
-		require.NoError(t, err)
-		client := rpc.NewClientWithCodec(goridgeRpc.NewClientCodec(conn))
-
-		req := &jobsProto.PushBatchRequest{Jobs: []*jobsProto.Job{createDummyJob(pipeline, autoAck)}}
-
-		er := &jobsProto.Empty{}
-		err = client.Call(push, req, er)
+		client := NewJobsClient(t, address)
+		_, err := client.Push(t.Context(), connect.NewRequest(&jobsProto.PushRequest{Job: createDummyJob(pipeline, autoAck)}))
 		require.NoError(t, err)
 	}
 }
@@ -70,7 +66,7 @@ func createDummyJob(pipeline string, autoAck bool) *jobsProto.Job {
 		Job:     "some/php/namespace",
 		Id:      uuid.NewString(),
 		Payload: []byte(`{"hello":"world"}`),
-		Headers: map[string]*jobsProto.HeaderValue{"test": {Value: []string{"test2"}}},
+		Headers: map[string]*jobsProto.JobHeaderValue{"test": {Values: []string{"test2"}}},
 		Options: &jobsProto.Options{
 			AutoAck:  autoAck,
 			Priority: 1,
@@ -82,78 +78,55 @@ func createDummyJob(pipeline string, autoAck bool) *jobsProto.Job {
 
 func PausePipelines(address string, pipes ...string) func(t *testing.T) {
 	return func(t *testing.T) {
-		conn, err := dialer.DialContext(context.Background(), "tcp", address)
-		assert.NoError(t, err)
-		client := rpc.NewClientWithCodec(goridgeRpc.NewClientCodec(conn))
-
-		pipe := &jobsProto.Pipelines{Pipelines: make([]string, len(pipes))}
-
-		for i := range pipes {
-			pipe.GetPipelines()[i] = pipes[i]
-		}
-
-		er := &jobsProto.Empty{}
-		err = client.Call(pause, pipe, er)
+		client := NewJobsClient(t, address)
+		_, err := client.Pause(t.Context(), connect.NewRequest(&jobsProto.Pipelines{Pipelines: slices.Clone(pipes)}))
 		assert.NoError(t, err)
 	}
 }
 
 func DestroyPipelines(address string, pipes ...string) func(t *testing.T) {
 	return func(t *testing.T) {
-		conn, err := dialer.DialContext(context.Background(), "tcp", address)
-		assert.NoError(t, err)
-		client := rpc.NewClientWithCodec(goridgeRpc.NewClientCodec(conn))
+		client := NewJobsClient(t, address)
+		req := &jobsProto.Pipelines{Pipelines: slices.Clone(pipes)}
 
-		pipe := &jobsProto.Pipelines{Pipelines: make([]string, len(pipes))}
-
-		for i := range pipes {
-			pipe.GetPipelines()[i] = pipes[i]
-		}
-
+		// Retry the destroy 10× with 1s gaps; if all attempts fail, return
+		// without asserting. Some negative tests intentionally destroy
+		// non-existent pipelines and rely on this silent-after-retry pattern.
 		for range 10 {
-			er := &jobsProto.Empty{}
-			err = client.Call(destroy, pipe, er)
-			if err != nil {
-				time.Sleep(time.Second)
-				continue
+			_, err := client.Destroy(t.Context(), connect.NewRequest(req))
+			if err == nil {
+				return
 			}
-			assert.NoError(t, err)
-			break
+			time.Sleep(time.Second)
 		}
 	}
 }
 
 func Stats(address string, state *jobState.State) func(t *testing.T) {
 	return func(t *testing.T) {
-		conn, err := dialer.DialContext(context.Background(), "tcp", address)
+		client := NewJobsClient(t, address)
+
+		resp, err := client.GetStats(t.Context(), connect.NewRequest(&emptypb.Empty{}))
 		require.NoError(t, err)
-		client := rpc.NewClientWithCodec(goridgeRpc.NewClientCodec(conn))
+		require.NotNil(t, resp)
+		require.NotEmpty(t, resp.Msg.GetStats())
 
-		st := &jobsProto.Stats{}
-		er := &jobsProto.Empty{}
-
-		err = client.Call(stat, er, st)
-		require.NoError(t, err)
-		require.NotNil(t, st)
-
-		state.Queue = st.Stats[0].Queue
-		state.Pipeline = st.Stats[0].Pipeline
-		state.Driver = st.Stats[0].Driver
-		state.Active = st.Stats[0].Active
-		state.Delayed = st.Stats[0].Delayed
-		state.Reserved = st.Stats[0].Reserved
-		state.Ready = st.Stats[0].Ready
-		state.Priority = st.Stats[0].Priority
+		st := resp.Msg.GetStats()[0]
+		state.Queue = st.GetQueue()
+		state.Pipeline = st.GetPipeline()
+		state.Driver = st.GetDriver()
+		state.Active = st.GetActive()
+		state.Delayed = st.GetDelayed()
+		state.Reserved = st.GetReserved()
+		state.Ready = st.GetReady()
+		state.Priority = st.GetPriority()
 	}
 }
 
 func DeclarePipe(topic string, address string, pipeline string) func(t *testing.T) {
 	return func(t *testing.T) {
-		conn, err := dialer.DialContext(context.Background(), "tcp", address)
-		assert.NoError(t, err)
-		client := rpc.NewClientWithCodec(goridgeRpc.NewClientCodec(conn))
-
-		pipe := &jobsProto.DeclareRequest{
+		client := NewJobsClient(t, address)
+		req := &jobsProto.DeclareRequest{
 			Pipeline: map[string]string{
 				"driver":            "google_pub_sub",
 				"name":              pipeline,
@@ -163,9 +136,7 @@ func DeclarePipe(topic string, address string, pipeline string) func(t *testing.
 				"project_id":        "test",
 			},
 		}
-
-		er := &jobsProto.Empty{}
-		err = client.Call("jobs.Declare", pipe, er)
+		_, err := client.Declare(t.Context(), connect.NewRequest(req))
 		assert.NoError(t, err)
 	}
 }
