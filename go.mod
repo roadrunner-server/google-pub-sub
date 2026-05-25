@@ -2,7 +2,7 @@ module github.com/roadrunner-server/google-pub-sub/v6
 
 go 1.26
 
-toolchain go1.26.0
+toolchain go1.26.3
 
 require (
 	cloud.google.com/go/pubsub/v2 v2.6.0
