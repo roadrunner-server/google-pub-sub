@@ -3,11 +3,11 @@ package pubsubjobs
 import (
 	"context"
 	"errors"
-	"sync/atomic"
 
 	"cloud.google.com/go/pubsub/v2"
 	"github.com/roadrunner-server/events"
 	"go.opentelemetry.io/otel/propagation"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
@@ -55,8 +55,7 @@ func (d *Driver) listen() {
 				d.listeners.Store(0)
 				return
 			}
-			st := status.Convert(err)
-			if st != nil && st.Message() == "grpc: the client connection is closing" {
+			if status.Code(err) == codes.Canceled {
 				// reduce the number of listeners
 				if d.listeners.Load() > 0 {
 					d.listeners.Add(^uint32(0))
@@ -68,7 +67,7 @@ func (d *Driver) listen() {
 
 			d.listeners.Store(0)
 			// the pipeline was stopped
-			if atomic.LoadUint64(&d.stopped) == 1 {
+			if d.stopped.Load() == 1 {
 				return
 			}
 
