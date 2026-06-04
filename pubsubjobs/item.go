@@ -46,7 +46,7 @@ type Options struct {
 	// Private ================
 	requeueFn func(ctx context.Context, job *Item) error
 	message   *pubsub.Message
-	stopped   *uint64
+	stopped   *atomic.Uint64
 }
 
 // DelayDuration returns delay duration in the form of time.Duration.
@@ -76,35 +76,26 @@ func (i *Item) Headers() map[string][]string {
 }
 
 // Context packs job context (job, id) into binary payload.
-// Not used in the amqp, amqp.Table used instead
 func (i *Item) Context() ([]byte, error) {
-	ctx, err := json.Marshal(
-		struct {
-			ID       string              `json:"id"`
-			Job      string              `json:"job"`
-			Driver   string              `json:"driver"`
-			Queue    string              `json:"queue"`
-			Headers  map[string][]string `json:"headers"`
-			Pipeline string              `json:"pipeline"`
-		}{
-			ID:       i.Ident,
-			Job:      i.Job,
-			Driver:   pluginName,
-			Headers:  i.headers,
-			Queue:    i.Options.Queue,
-			Pipeline: i.Options.Pipeline,
-		},
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return ctx, nil
+	return json.Marshal(struct {
+		ID       string              `json:"id"`
+		Job      string              `json:"job"`
+		Driver   string              `json:"driver"`
+		Queue    string              `json:"queue"`
+		Headers  map[string][]string `json:"headers"`
+		Pipeline string              `json:"pipeline"`
+	}{
+		ID:       i.Ident,
+		Job:      i.Job,
+		Driver:   pluginName,
+		Headers:  i.headers,
+		Queue:    i.Options.Queue,
+		Pipeline: i.Options.Pipeline,
+	})
 }
 
 func (i *Item) Ack() error {
-	if atomic.LoadUint64(i.Options.stopped) == 1 {
+	if i.Options.stopped.Load() == 1 {
 		return errors.Str("failed to acknowledge the JOB, the pipeline is probably stopped")
 	}
 	// return in case of auto-ack
@@ -117,7 +108,7 @@ func (i *Item) Ack() error {
 }
 
 func (i *Item) Nack() error {
-	if atomic.LoadUint64(i.Options.stopped) == 1 {
+	if i.Options.stopped.Load() == 1 {
 		return errors.Str("failed to acknowledge the JOB, the pipeline is probably stopped")
 	}
 
@@ -132,7 +123,7 @@ func (i *Item) Nack() error {
 }
 
 func (i *Item) NackWithOptions(requeue bool, _ int) error {
-	if atomic.LoadUint64(i.Options.stopped) == 1 {
+	if i.Options.stopped.Load() == 1 {
 		return errors.Str("failed to acknowledge the JOB, the pipeline is probably stopped")
 	}
 
@@ -170,7 +161,7 @@ func (i *Item) NackWithOptions(requeue bool, _ int) error {
 
 // Requeue is a non-native method, it's used to requeue the message back to the queue but with new headers
 func (i *Item) Requeue(headers map[string][]string, _ int) error {
-	if atomic.LoadUint64(i.Options.stopped) == 1 {
+	if i.Options.stopped.Load() == 1 {
 		return errors.Str("failed to acknowledge the JOB, the pipeline is probably stopped")
 	}
 
@@ -249,7 +240,7 @@ func (d *Driver) unpack(message *pubsub.Message) *Item {
 
 	var autoAck bool
 	if val, ok := attributes[jobs.RRAutoAck]; ok {
-		autoAck = stob(val)
+		autoAck, _ = strconv.ParseBool(val)
 	}
 
 	var dl int
@@ -286,22 +277,6 @@ func (d *Driver) unpack(message *pubsub.Message) *Item {
 			requeueFn: d.handlePush,
 		},
 	}
-}
-
-func btos(b bool) string {
-	if b {
-		return "true"
-	}
-
-	return "false"
-}
-
-func stob(s string) bool {
-	if s != "" {
-		return s == "true"
-	}
-
-	return false
 }
 
 func handleResult(err error, ar pubsub.AcknowledgeStatus) error {

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -23,7 +22,9 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -67,7 +68,7 @@ type Driver struct {
 
 	// if a user invokes several resume operations
 	listeners atomic.Uint32
-	stopped   uint64
+	stopped   atomic.Uint64
 }
 
 // FromConfig initializes google_pub_sub_driver_ pipeline
@@ -283,7 +284,7 @@ func (d *Driver) State(ctx context.Context) (*jobs.State, error) {
 func (d *Driver) Pause(ctx context.Context, p string) error {
 	start := time.Now().UTC()
 
-	_, span := trace.SpanFromContext(ctx).TracerProvider().Tracer(tracerName).Start(ctx, "google_pub_sub_resume")
+	_, span := trace.SpanFromContext(ctx).TracerProvider().Tracer(tracerName).Start(ctx, "google_pub_sub_pause")
 	defer span.End()
 
 	// load atomic value
@@ -340,7 +341,7 @@ func (d *Driver) Resume(ctx context.Context, p string) error {
 
 func (d *Driver) Stop(ctx context.Context) error {
 	start := time.Now().UTC()
-	atomic.StoreUint64(&d.stopped, 1)
+	d.stopped.Store(1)
 
 	_, span := trace.SpanFromContext(ctx).TracerProvider().Tracer(tracerName).Start(ctx, "google_pub_sub_stop")
 	defer span.End()
@@ -371,12 +372,12 @@ func (d *Driver) manageSubscriptions() error {
 
 	topic, err := d.gclient.TopicAdminClient.CreateTopic(ctx, topicpb)
 	if err != nil {
-		if !strings.Contains(err.Error(), "Topic already exists") {
+		if status.Code(err) != codes.AlreadyExists {
 			return err
 		}
 
 		// topic would be nil if it already exists
-		topic, err = d.gclient.TopicAdminClient.GetTopic(ctx, &pubsubpb.GetTopicRequest{Topic: d.topicStr})
+		topic, err = d.gclient.TopicAdminClient.GetTopic(ctx, &pubsubpb.GetTopicRequest{Topic: topicpb.Name})
 		if err != nil {
 			return err
 		}
@@ -392,7 +393,7 @@ func (d *Driver) manageSubscriptions() error {
 		}
 		dltopic, err = d.gclient.TopicAdminClient.CreateTopic(ctx, dltopicpb)
 		if err != nil {
-			if !strings.Contains(err.Error(), "already exists") {
+			if status.Code(err) != codes.AlreadyExists {
 				return err
 			}
 
@@ -414,7 +415,7 @@ func (d *Driver) manageSubscriptions() error {
 		DeadLetterPolicy:   initOrNil(dltopic, d.maxDeliveryAttempts),
 	})
 	if err != nil {
-		if !strings.Contains(err.Error(), "already exists") {
+		if status.Code(err) != codes.AlreadyExists {
 			return err
 		}
 	}
@@ -449,7 +450,7 @@ func (d *Driver) handlePush(ctx context.Context, job *Item) error {
 			jobs.RRDelay:    strconv.Itoa(int(job.Options.Delay)),
 			jobs.RRHeaders:  string(data),
 			jobs.RRPriority: strconv.Itoa(int(job.Options.Priority)),
-			jobs.RRAutoAck:  btos(job.Options.AutoAck),
+			jobs.RRAutoAck:  strconv.FormatBool(job.Options.AutoAck),
 		},
 		PublishTime: time.Now().UTC(),
 	})
