@@ -2,25 +2,22 @@ package helpers
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
-	"net/http"
+	"net/rpc"
 	"slices"
 	"testing"
 	"time"
 
 	"cloud.google.com/go/pubsub/v2"
 	"cloud.google.com/go/pubsub/v2/apiv1/pubsubpb"
-	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	jobsProto "github.com/roadrunner-server/api-go/v6/jobs/v2"
-	"github.com/roadrunner-server/api-go/v6/jobs/v2/jobsV2connect"
 	jobState "github.com/roadrunner-server/api-plugins/v6/jobs"
+	goridgeRpc "github.com/roadrunner-server/goridge/v4/pkg/rpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/http2"
 	otherit "google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
@@ -28,27 +25,19 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-func newHTTPClient(t *testing.T) *http.Client {
+func NewJobsClient(t *testing.T, address string) *rpc.Client {
 	t.Helper()
-	httpc := &http.Client{Transport: &http2.Transport{
-		AllowHTTP: true,
-		DialTLSContext: func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
-			return new(net.Dialer).DialContext(ctx, network, addr)
-		},
-	}}
-	t.Cleanup(httpc.CloseIdleConnections)
-	return httpc
-}
-
-func NewJobsClient(t *testing.T, address string) jobsV2connect.JobsServiceClient {
-	t.Helper()
-	return jobsV2connect.NewJobsServiceClient(newHTTPClient(t), "http://"+address)
+	conn, err := new(net.Dialer).DialContext(t.Context(), "tcp", address)
+	require.NoError(t, err)
+	client := rpc.NewClientWithCodec(goridgeRpc.NewClientCodec(conn))
+	t.Cleanup(func() { _ = client.Close() })
+	return client
 }
 
 func ResumePipes(address string, pipes ...string) func(t *testing.T) {
 	return func(t *testing.T) {
 		client := NewJobsClient(t, address)
-		_, err := client.Resume(t.Context(), connect.NewRequest(&jobsProto.Pipelines{Pipelines: slices.Clone(pipes)}))
+		err := client.Call("jobs.Resume", &jobsProto.Pipelines{Pipelines: slices.Clone(pipes)}, &jobsProto.JobsHandlerResponse{})
 		require.NoError(t, err)
 	}
 }
@@ -56,7 +45,7 @@ func ResumePipes(address string, pipes ...string) func(t *testing.T) {
 func PushToPipe(pipeline string, autoAck bool, address string) func(t *testing.T) {
 	return func(t *testing.T) {
 		client := NewJobsClient(t, address)
-		_, err := client.Push(t.Context(), connect.NewRequest(&jobsProto.PushRequest{Job: createDummyJob(pipeline, autoAck)}))
+		err := client.Call("jobs.Push", &jobsProto.PushRequest{Job: createDummyJob(pipeline, autoAck)}, &jobsProto.JobsHandlerResponse{})
 		require.NoError(t, err)
 	}
 }
@@ -79,7 +68,7 @@ func createDummyJob(pipeline string, autoAck bool) *jobsProto.Job {
 func PausePipelines(address string, pipes ...string) func(t *testing.T) {
 	return func(t *testing.T) {
 		client := NewJobsClient(t, address)
-		_, err := client.Pause(t.Context(), connect.NewRequest(&jobsProto.Pipelines{Pipelines: slices.Clone(pipes)}))
+		err := client.Call("jobs.Pause", &jobsProto.Pipelines{Pipelines: slices.Clone(pipes)}, &jobsProto.JobsHandlerResponse{})
 		assert.NoError(t, err)
 	}
 }
@@ -93,7 +82,7 @@ func DestroyPipelines(address string, pipes ...string) func(t *testing.T) {
 		// without asserting. Some negative tests intentionally destroy
 		// non-existent pipelines and rely on this silent-after-retry pattern.
 		for range 10 {
-			_, err := client.Destroy(t.Context(), connect.NewRequest(req))
+			err := client.Call("jobs.Destroy", req, &jobsProto.Pipelines{})
 			if err == nil {
 				return
 			}
@@ -106,12 +95,12 @@ func Stats(address string, state *jobState.State) func(t *testing.T) {
 	return func(t *testing.T) {
 		client := NewJobsClient(t, address)
 
-		resp, err := client.GetStats(t.Context(), connect.NewRequest(&emptypb.Empty{}))
+		resp := &jobsProto.Stats{}
+		err := client.Call("jobs.GetStats", &emptypb.Empty{}, resp)
 		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.NotEmpty(t, resp.Msg.GetStats())
+		require.NotEmpty(t, resp.GetStats())
 
-		st := resp.Msg.GetStats()[0]
+		st := resp.GetStats()[0]
 		state.Queue = st.GetQueue()
 		state.Pipeline = st.GetPipeline()
 		state.Driver = st.GetDriver()
@@ -136,7 +125,7 @@ func DeclarePipe(topic string, address string, pipeline string) func(t *testing.
 				"project_id":        "test",
 			},
 		}
-		_, err := client.Declare(t.Context(), connect.NewRequest(req))
+		err := client.Call("jobs.Declare", req, &jobsProto.JobsHandlerResponse{})
 		assert.NoError(t, err)
 	}
 }
