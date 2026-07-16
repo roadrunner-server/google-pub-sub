@@ -282,6 +282,7 @@ cloud.google.com/go/compute v1.52.0 h1:SxiTrTFR/QmDbZ0cfo/8VxK/NUZSwn92+iHLDSQ51
 cloud.google.com/go/compute v1.53.0 h1:dILGanjePNsYfZVYYv6K0d4+IPnKX1gn84Fk8jDPNvs=
 cloud.google.com/go/compute v1.54.0 h1:4CKmnpO+40z44bKG5bdcKxQ7ocNpRtOc9SCLLUzze1w=
 cloud.google.com/go/compute v1.61.0 h1:EEmWRSTwKzAy7uK97BFopgJu2Jgh2QHQVCc/uM7Cskw=
+cloud.google.com/go/compute v1.62.0 h1:tJ7lKJ8YEVa6vZX03Jc8o1YePbjKDOQhDw1BscMZ1bs=
 cloud.google.com/go/compute v1.63.0 h1:KsBourH0wajM4RhzwPwRMKbxHVdvzGsk7StvACoWXD8=
 cloud.google.com/go/compute v1.64.0 h1:7MmuzeAxlG5MOG5PQD2NLtyYR6bWjkvGljRu7pByoRU=
 cloud.google.com/go/compute/metadata v0.3.0/go.mod h1:zFmK7XCadkQkj6TtorcaGlCW1hT1fIilQDwofLpJ20k=
@@ -825,6 +826,7 @@ cloud.google.com/go/pubsub v1.50.0/go.mod h1:Di2Y+nqXBpIS+dXUEJPQzLh8PbIQZMLE9IV
 cloud.google.com/go/pubsub v1.50.1 h1:fzbXpPyJnSGvWXF1jabhQeXyxdbCIkXTpjXHy7xviBM=
 cloud.google.com/go/pubsub v1.50.2 h1:54Up97HnThdP4H8jjWJSSQ/mnYG2EKon7ZSNETRq0tM=
 cloud.google.com/go/pubsub v1.50.4 h1:mPvjbI9tbPtH3cYyDM/gX6/kRAy7qfglW4W+De8subs=
+cloud.google.com/go/pubsub v1.51.0 h1:XOaCejsqX7EEtUdQz+WPag66wWsUUGliyCOfGPKfo90=
 cloud.google.com/go/pubsublite v1.8.1 h1:pX+idpWMIH30/K7c0epN6V703xpIcMXWRjKJsz0tYGY=
 cloud.google.com/go/pubsublite v1.8.1/go.mod h1:fOLdU4f5xldK4RGJrBMm+J7zMWNj/k4PxwEZXy39QS0=
 cloud.google.com/go/pubsublite v1.8.2 h1:jLQozsEVr+c6tOU13vDugtnaBSUy/PD5zK6mhm+uF1Y=
