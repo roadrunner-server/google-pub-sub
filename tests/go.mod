@@ -22,7 +22,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/api v0.292.0
 	google.golang.org/grpc v1.83.0
-	google.golang.org/protobuf v1.36.11
+	google.golang.org/protobuf v1.36.12
 )
 
 replace github.com/roadrunner-server/google-pub-sub/v6 => ..
