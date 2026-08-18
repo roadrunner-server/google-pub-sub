@@ -8,15 +8,12 @@ import (
 	"net/rpc"
 	"slices"
 	"testing"
-	"time"
 
 	"cloud.google.com/go/pubsub/v2"
 	"cloud.google.com/go/pubsub/v2/apiv1/pubsubpb"
 	"github.com/google/uuid"
 	jobsProto "github.com/roadrunner-server/api-go/v6/jobs/v2"
-	jobState "github.com/roadrunner-server/api-plugins/v6/jobs"
 	goridgeRpc "github.com/roadrunner-server/goridge/v4/pkg/rpc"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	otherit "google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -25,28 +22,58 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+// emulatorAddr is the address the compose file publishes the emulator on, and
+// the endpoint every test config points the driver at.
+const emulatorAddr = "127.0.0.1:8085"
+
+// emulatorProject is the project the emulator is started with.
+const emulatorProject = "test"
+
 func NewJobsClient(t *testing.T, address string) *rpc.Client {
 	t.Helper()
+
 	conn, err := new(net.Dialer).DialContext(t.Context(), "tcp", address)
 	require.NoError(t, err)
+
 	client := rpc.NewClientWithCodec(goridgeRpc.NewClientCodec(conn))
 	t.Cleanup(func() { _ = client.Close() })
+
 	return client
 }
 
 func ResumePipes(address string, pipes ...string) func(t *testing.T) {
 	return func(t *testing.T) {
 		client := NewJobsClient(t, address)
-		err := client.Call("jobs.Resume", &jobsProto.Pipelines{Pipelines: slices.Clone(pipes)}, &jobsProto.JobsHandlerResponse{})
-		require.NoError(t, err)
+		require.NoError(t, client.Call("jobs.Resume",
+			&jobsProto.Pipelines{Pipelines: slices.Clone(pipes)},
+			&jobsProto.JobsHandlerResponse{}))
+	}
+}
+
+func PausePipelines(address string, pipes ...string) func(t *testing.T) {
+	return func(t *testing.T) {
+		client := NewJobsClient(t, address)
+		require.NoError(t, client.Call("jobs.Pause",
+			&jobsProto.Pipelines{Pipelines: slices.Clone(pipes)},
+			&jobsProto.JobsHandlerResponse{}))
+	}
+}
+
+func DestroyPipelines(address string, pipes ...string) func(t *testing.T) {
+	return func(t *testing.T) {
+		client := NewJobsClient(t, address)
+		require.NoError(t, client.Call("jobs.Destroy",
+			&jobsProto.Pipelines{Pipelines: slices.Clone(pipes)},
+			&jobsProto.Pipelines{}))
 	}
 }
 
 func PushToPipe(pipeline string, autoAck bool, address string) func(t *testing.T) {
 	return func(t *testing.T) {
 		client := NewJobsClient(t, address)
-		err := client.Call("jobs.Push", &jobsProto.PushRequest{Job: createDummyJob(pipeline, autoAck)}, &jobsProto.JobsHandlerResponse{})
-		require.NoError(t, err)
+		require.NoError(t, client.Call("jobs.Push",
+			&jobsProto.PushRequest{Job: createDummyJob(pipeline, autoAck)},
+			&jobsProto.JobsHandlerResponse{}))
 	}
 }
 
@@ -65,88 +92,81 @@ func createDummyJob(pipeline string, autoAck bool) *jobsProto.Job {
 	}
 }
 
-func PausePipelines(address string, pipes ...string) func(t *testing.T) {
-	return func(t *testing.T) {
-		client := NewJobsClient(t, address)
-		err := client.Call("jobs.Pause", &jobsProto.Pipelines{Pipelines: slices.Clone(pipes)}, &jobsProto.JobsHandlerResponse{})
-		assert.NoError(t, err)
-	}
-}
-
-func DestroyPipelines(address string, pipes ...string) func(t *testing.T) {
-	return func(t *testing.T) {
-		client := NewJobsClient(t, address)
-		req := &jobsProto.Pipelines{Pipelines: slices.Clone(pipes)}
-
-		// Retry the destroy 10× with 1s gaps; if all attempts fail, return
-		// without asserting. Some negative tests intentionally destroy
-		// non-existent pipelines and rely on this silent-after-retry pattern.
-		for range 10 {
-			err := client.Call("jobs.Destroy", req, &jobsProto.Pipelines{})
-			if err == nil {
-				return
-			}
-			time.Sleep(time.Second)
-		}
-	}
-}
-
-func Stats(address string, state *jobState.State) func(t *testing.T) {
-	return func(t *testing.T) {
-		client := NewJobsClient(t, address)
-
-		resp := &jobsProto.Stats{}
-		err := client.Call("jobs.GetStats", &emptypb.Empty{}, resp)
-		require.NoError(t, err)
-		require.NotEmpty(t, resp.GetStats())
-
-		st := resp.GetStats()[0]
-		state.Queue = st.GetQueue()
-		state.Pipeline = st.GetPipeline()
-		state.Driver = st.GetDriver()
-		state.Active = st.GetActive()
-		state.Delayed = st.GetDelayed()
-		state.Reserved = st.GetReserved()
-		state.Ready = st.GetReady()
-		state.Priority = st.GetPriority()
-	}
-}
-
+// DeclarePipe declares a pipeline over rpc and requires the call to succeed.
 func DeclarePipe(topic string, address string, pipeline string) func(t *testing.T) {
 	return func(t *testing.T) {
-		client := NewJobsClient(t, address)
-		req := &jobsProto.DeclareRequest{
-			Pipeline: map[string]string{
-				"driver":            "google_pub_sub",
-				"name":              pipeline,
-				"priority":          "3",
-				"topic":             topic,
-				"dead_letter_topic": "dead_letter_topic",
-				"project_id":        "test",
-			},
-		}
-		err := client.Call("jobs.Declare", req, &jobsProto.JobsHandlerResponse{})
-		assert.NoError(t, err)
+		require.NoError(t, Declare(t, address, map[string]string{
+			"driver":            "google_pub_sub",
+			"name":              pipeline,
+			"priority":          "3",
+			"topic":             topic,
+			"dead_letter_topic": "dead_letter_topic",
+			"project_id":        emulatorProject,
+		}))
 	}
 }
 
-func CleanEmulator() error {
-	ctx := context.Background()
-	client, err := pubsub.NewClient(ctx, "test",
+// Declare issues a raw declare call and returns its error, so negative tests
+// can assert on a rejected pipeline configuration.
+func Declare(t *testing.T, address string, pipeline map[string]string) error {
+	t.Helper()
+
+	client := NewJobsClient(t, address)
+
+	return client.Call("jobs.Declare",
+		&jobsProto.DeclareRequest{Pipeline: pipeline},
+		&jobsProto.JobsHandlerResponse{})
+}
+
+// Stats returns the per-pipeline stats the jobs plugin reports.
+func Stats(t *testing.T, address string) []*jobsProto.Stat {
+	t.Helper()
+
+	resp := &jobsProto.Stats{}
+	require.NoError(t, NewJobsClient(t, address).Call("jobs.GetStats", &emptypb.Empty{}, resp))
+
+	return resp.GetStats()
+}
+
+// newEmulatorClient dials the emulator directly, bypassing RoadRunner.
+func newEmulatorClient(ctx context.Context) (*pubsub.Client, error) {
+	return pubsub.NewClient(ctx, emulatorProject,
 		option.WithoutAuthentication(),
 		option.WithTelemetryDisabled(),
-		option.WithEndpoint("127.0.0.1:8085"),
+		option.WithEndpoint(emulatorAddr),
 		option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())))
+}
+
+// PublishRaw puts a message on the topic without going through the jobs plugin,
+// so a test can hand the listener attributes RoadRunner would never produce.
+func PublishRaw(t *testing.T, topic string, data []byte, attributes map[string]string) {
+	t.Helper()
+
+	client, err := newEmulatorClient(t.Context())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = client.Close() })
+
+	_, err = client.Publisher(topic).Publish(t.Context(), &pubsub.Message{
+		Data:       data,
+		Attributes: attributes,
+	}).Get(t.Context())
+	require.NoError(t, err)
+}
+
+// CleanEmulator drops every subscription and topic, so each test starts against
+// an empty broker and cannot inherit messages from the previous one.
+func CleanEmulator() error {
+	ctx := context.Background()
+
+	client, err := newEmulatorClient(ctx)
 	if err != nil {
 		return err
 	}
 	defer client.Close()
 
-	ls := pubsubpb.ListSubscriptionsRequest{
-		Project: fmt.Sprintf("projects/%s", client.Project()),
-	}
+	project := fmt.Sprintf("projects/%s", client.Project())
 
-	subiter := client.SubscriptionAdminClient.ListSubscriptions(ctx, &ls)
+	subiter := client.SubscriptionAdminClient.ListSubscriptions(ctx, &pubsubpb.ListSubscriptionsRequest{Project: project})
 	for {
 		sub, err := subiter.Next()
 		if err != nil {
@@ -155,19 +175,13 @@ func CleanEmulator() error {
 			}
 			return err
 		}
-		subr := pubsubpb.DeleteSubscriptionRequest{
-			Subscription: sub.GetName(),
-		}
 
-		if err := client.SubscriptionAdminClient.DeleteSubscription(ctx, &subr); err != nil {
+		if err := client.SubscriptionAdminClient.DeleteSubscription(ctx, &pubsubpb.DeleteSubscriptionRequest{Subscription: sub.GetName()}); err != nil {
 			return err
 		}
 	}
 
-	titer := client.TopicAdminClient.ListTopics(ctx, &pubsubpb.ListTopicsRequest{
-		Project: fmt.Sprintf("projects/%s", client.Project()),
-	})
-
+	titer := client.TopicAdminClient.ListTopics(ctx, &pubsubpb.ListTopicsRequest{Project: project})
 	for {
 		topic, err := titer.Next()
 		if err != nil {
@@ -177,10 +191,7 @@ func CleanEmulator() error {
 			return err
 		}
 
-		err = client.TopicAdminClient.DeleteTopic(ctx, &pubsubpb.DeleteTopicRequest{
-			Topic: topic.GetName(),
-		})
-		if err != nil {
+		if err := client.TopicAdminClient.DeleteTopic(ctx, &pubsubpb.DeleteTopicRequest{Topic: topic.GetName()}); err != nil {
 			return err
 		}
 	}
