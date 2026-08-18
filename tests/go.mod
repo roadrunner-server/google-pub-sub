@@ -7,22 +7,20 @@ toolchain go1.26.5
 require (
 	cloud.google.com/go/pubsub/v2 v2.6.1
 	github.com/google/uuid v1.6.0
-	github.com/roadrunner-server/api-go/v6 v6.0.0-beta.13
-	github.com/roadrunner-server/api-plugins/v6 v6.0.0-beta.2
+	github.com/roadrunner-server/api-go/v6 v6.0.0-beta.14
 	github.com/roadrunner-server/config/v6 v6.0.0-beta.3
 	github.com/roadrunner-server/endure/v2 v2.6.2
 	github.com/roadrunner-server/google-pub-sub/v6 v6.0.0
 	github.com/roadrunner-server/goridge/v4 v4.0.0-beta.3
-	github.com/roadrunner-server/informer/v6 v6.0.0-beta.3
-	github.com/roadrunner-server/jobs/v6 v6.0.0-beta.8
+	github.com/roadrunner-server/informer/v6 v6.0.0-beta.4
+	github.com/roadrunner-server/jobs/v6 v6.0.0-beta.9
 	github.com/roadrunner-server/logger/v6 v6.0.0-beta.3
-	github.com/roadrunner-server/resetter/v6 v6.0.0-beta.4
+	github.com/roadrunner-server/resetter/v6 v6.0.0-beta.5
 	github.com/roadrunner-server/rpc/v6 v6.0.0-beta.5
 	github.com/roadrunner-server/server/v6 v6.0.0-beta.6
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/api v0.293.0
 	google.golang.org/grpc v1.83.0
-	google.golang.org/protobuf v1.36.12
 )
 
 replace github.com/roadrunner-server/google-pub-sub/v6 => ..
@@ -56,6 +54,7 @@ require (
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.70.1 // indirect
 	github.com/prometheus/procfs v0.21.1 // indirect
+	github.com/roadrunner-server/api-plugins/v6 v6.0.0-beta.2 // indirect
 	github.com/roadrunner-server/errors v1.5.0 // indirect
 	github.com/roadrunner-server/events v1.0.1 // indirect
 	github.com/roadrunner-server/pool/v2 v2.0.0-beta.1 // indirect
@@ -93,5 +92,6 @@ require (
 	google.golang.org/genproto v0.0.0-20260810153831-ec0a7760b754 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260810153831-ec0a7760b754 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260810153831-ec0a7760b754 // indirect
+	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
