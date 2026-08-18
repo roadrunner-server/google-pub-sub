@@ -12,14 +12,13 @@ import (
 	"cloud.google.com/go/pubsub/v2"
 	"cloud.google.com/go/pubsub/v2/apiv1/pubsubpb"
 	"github.com/google/uuid"
-	jobsProto "github.com/roadrunner-server/api-go/v6/jobs/v2"
+	jobsProto "github.com/roadrunner-server/api-go/v6/jobs/v1"
 	goridgeRpc "github.com/roadrunner-server/goridge/v4/pkg/rpc"
 	"github.com/stretchr/testify/require"
 	otherit "google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // emulatorAddr is the address the compose file publishes the emulator on, and
@@ -46,7 +45,7 @@ func ResumePipes(address string, pipes ...string) func(t *testing.T) {
 		client := NewJobsClient(t, address)
 		require.NoError(t, client.Call("jobs.Resume",
 			&jobsProto.Pipelines{Pipelines: slices.Clone(pipes)},
-			&jobsProto.JobsHandlerResponse{}))
+			&jobsProto.Empty{}))
 	}
 }
 
@@ -55,7 +54,7 @@ func PausePipelines(address string, pipes ...string) func(t *testing.T) {
 		client := NewJobsClient(t, address)
 		require.NoError(t, client.Call("jobs.Pause",
 			&jobsProto.Pipelines{Pipelines: slices.Clone(pipes)},
-			&jobsProto.JobsHandlerResponse{}))
+			&jobsProto.Empty{}))
 	}
 }
 
@@ -73,7 +72,7 @@ func PushToPipe(pipeline string, autoAck bool, address string) func(t *testing.T
 		client := NewJobsClient(t, address)
 		require.NoError(t, client.Call("jobs.Push",
 			&jobsProto.PushRequest{Job: createDummyJob(pipeline, autoAck)},
-			&jobsProto.JobsHandlerResponse{}))
+			&jobsProto.Empty{}))
 	}
 }
 
@@ -82,7 +81,7 @@ func createDummyJob(pipeline string, autoAck bool) *jobsProto.Job {
 		Job:     "some/php/namespace",
 		Id:      uuid.NewString(),
 		Payload: []byte(`{"hello":"world"}`),
-		Headers: map[string]*jobsProto.JobHeaderValue{"test": {Values: []string{"test2"}}},
+		Headers: map[string]*jobsProto.HeaderValue{"test": {Value: []string{"test2"}}},
 		Options: &jobsProto.Options{
 			AutoAck:  autoAck,
 			Priority: 1,
@@ -115,7 +114,7 @@ func Declare(t *testing.T, address string, pipeline map[string]string) error {
 
 	return client.Call("jobs.Declare",
 		&jobsProto.DeclareRequest{Pipeline: pipeline},
-		&jobsProto.JobsHandlerResponse{})
+		&jobsProto.Empty{})
 }
 
 // Stats returns the per-pipeline stats the jobs plugin reports.
@@ -123,7 +122,7 @@ func Stats(t *testing.T, address string) []*jobsProto.Stat {
 	t.Helper()
 
 	resp := &jobsProto.Stats{}
-	require.NoError(t, NewJobsClient(t, address).Call("jobs.GetStats", &emptypb.Empty{}, resp))
+	require.NoError(t, NewJobsClient(t, address).Call("jobs.Stat", &jobsProto.Empty{}, resp))
 
 	return resp.GetStats()
 }
