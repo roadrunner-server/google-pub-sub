@@ -8,7 +8,6 @@ require (
 	cloud.google.com/go/pubsub/v2 v2.6.1
 	github.com/google/uuid v1.6.0
 	github.com/roadrunner-server/api-go/v6 v6.0.0-beta.13
-	github.com/roadrunner-server/api-plugins/v6 v6.0.0-beta.2
 	github.com/roadrunner-server/config/v6 v6.0.0-beta.3
 	github.com/roadrunner-server/endure/v2 v2.6.2
 	github.com/roadrunner-server/google-pub-sub/v6 v6.0.0
@@ -56,6 +55,7 @@ require (
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.70.1 // indirect
 	github.com/prometheus/procfs v0.21.1 // indirect
+	github.com/roadrunner-server/api-plugins/v6 v6.0.0-beta.2 // indirect
 	github.com/roadrunner-server/errors v1.5.0 // indirect
 	github.com/roadrunner-server/events v1.0.1 // indirect
 	github.com/roadrunner-server/pool/v2 v2.0.0-beta.1 // indirect
