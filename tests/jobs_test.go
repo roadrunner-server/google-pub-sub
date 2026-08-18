@@ -1,459 +1,248 @@
 package pubsubjobs
 
 import (
-	"log/slog"
-	"os"
-	"os/signal"
-	"sync"
-	"syscall"
 	"testing"
-	"time"
 
 	"tests/helpers"
-	mocklogger "tests/mock"
 
-	"github.com/roadrunner-server/config/v6"
-	"github.com/roadrunner-server/endure/v2"
 	googlePubSub "github.com/roadrunner-server/google-pub-sub/v6"
 	"github.com/roadrunner-server/informer/v6"
 	"github.com/roadrunner-server/jobs/v6"
-	"github.com/roadrunner-server/logger/v6"
 	"github.com/roadrunner-server/resetter/v6"
 	rpcPlugin "github.com/roadrunner-server/rpc/v6"
 	"github.com/roadrunner-server/server/v6"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestInit(t *testing.T) {
-	err := helpers.CleanEmulator()
-	if err != nil {
-		assert.FailNow(t, "error", err.Error())
-	}
+const (
+	rpcAddr = "127.0.0.1:6001"
+	pqAddr  = "127.0.0.1:6601"
+	// declared is the pipeline the declare configs create over rpc.
+	declared = "test-3"
+)
 
-	cont := endure.New(slog.LevelDebug)
-
-	cfg := &config.Plugin{
-		Version: "2025.1.2",
-		Path:    "configs/.rr-init.yaml",
-	}
-
-	err = cont.RegisterAll(
-		cfg,
+func jobsPlugins() []any {
+	return []any{
 		&server.Plugin{},
 		&rpcPlugin.Plugin{},
-		&logger.Plugin{},
 		&jobs.Plugin{},
 		&resetter.Plugin{},
 		&informer.Plugin{},
 		&googlePubSub.Plugin{},
-	)
-	assert.NoError(t, err)
-
-	err = cont.Init()
-	if err != nil {
-		t.Fatal(err)
 	}
-
-	ch, err := cont.Serve()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-
-	wg := &sync.WaitGroup{}
-
-	stopCh := make(chan struct{}, 1)
-
-	wg.Go(func() {
-		for {
-			select {
-			case e := <-ch:
-				assert.Fail(t, "error", e.Error.Error())
-				err = cont.Stop()
-				if err != nil {
-					assert.FailNow(t, "error", err.Error())
-				}
-			case <-sig:
-				err = cont.Stop()
-				if err != nil {
-					assert.FailNow(t, "error", err.Error())
-				}
-				return
-			case <-stopCh:
-				// timeout
-				err = cont.Stop()
-				if err != nil {
-					assert.FailNow(t, "error", err.Error())
-				}
-				return
-			}
-		}
-	})
-
-	time.Sleep(time.Second * 3)
-	t.Run("PushPipeline", helpers.PushToPipe("test-1", false, "127.0.0.1:6001"))
-	t.Run("PushPipeline", helpers.PushToPipe("test-2", false, "127.0.0.1:6001"))
-	time.Sleep(time.Second * 2)
-
-	t.Run("DestroyPipeline", helpers.DestroyPipelines("127.0.0.1:6001", "test-1", "test-2"))
-
-	stopCh <- struct{}{}
-	wg.Wait()
 }
 
-func TestDeclare(t *testing.T) {
-	err := helpers.CleanEmulator()
-	if err != nil {
-		assert.FailNow(t, "error", err.Error())
-	}
+// boot starts the container with the observed logger and waits for the rpc
+// listener, which is the readiness signal the fixed sleeps used to stand in for.
+func boot(t *testing.T, cfgPath string, addr string) (*helpers.RR, func()) {
+	t.Helper()
 
-	cont := endure.New(slog.LevelDebug)
-
-	cfg := &config.Plugin{
-		Version: "2025.1.0",
-		Path:    "configs/.rr-declare.yaml",
-	}
-
-	err = cont.RegisterAll(
-		cfg,
-		&server.Plugin{},
-		&rpcPlugin.Plugin{},
-		&logger.Plugin{},
-		&jobs.Plugin{},
-		&resetter.Plugin{},
-		&informer.Plugin{},
-		&googlePubSub.Plugin{},
+	return helpers.Start(t, cfgPath, jobsPlugins(),
+		helpers.WithObservedLogger(),
+		helpers.WithTCPProbe(addr),
 	)
-	assert.NoError(t, err)
-
-	err = cont.Init()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ch, err := cont.Serve()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-
-	wg := &sync.WaitGroup{}
-
-	stopCh := make(chan struct{}, 1)
-
-	wg.Go(func() {
-		for {
-			select {
-			case e := <-ch:
-				assert.Fail(t, "error", e.Error.Error())
-				err = cont.Stop()
-				if err != nil {
-					assert.FailNow(t, "error", err.Error())
-				}
-			case <-sig:
-				err = cont.Stop()
-				if err != nil {
-					assert.FailNow(t, "error", err.Error())
-				}
-				return
-			case <-stopCh:
-				// timeout
-				err = cont.Stop()
-				if err != nil {
-					assert.FailNow(t, "error", err.Error())
-				}
-				return
-			}
-		}
-	})
-
-	time.Sleep(time.Second * 3)
-
-	t.Run("DeclarePipeline", helpers.DeclarePipe("rr1", "127.0.0.1:6001", "test-3"))
-	t.Run("ConsumePipeline", helpers.ResumePipes("127.0.0.1:6001", "test-3"))
-	t.Run("PushPipeline", helpers.PushToPipe("test-3", false, "127.0.0.1:6001"))
-	time.Sleep(time.Second)
-	t.Run("PausePipeline", helpers.PausePipelines("127.0.0.1:6001", "test-3"))
-	time.Sleep(time.Second)
-	t.Run("DestroyPipeline", helpers.DestroyPipelines("127.0.0.1:6001", "test-3"))
-
-	time.Sleep(time.Second * 5)
-	stopCh <- struct{}{}
-	wg.Wait()
 }
 
-func TestJobsError(t *testing.T) {
-	err := helpers.CleanEmulator()
-	if err != nil {
-		assert.FailNow(t, "error", err.Error())
-	}
+// TestBoots covers the config-declared pipelines. Both subscriptions are
+// created up front, and only the pipeline carrying dead_letter_topic asks the
+// emulator for a second topic.
+func TestBoots(t *testing.T) {
+	rr, _ := boot(t, "configs/.rr-init.yaml", rpcAddr)
 
-	cont := endure.New(slog.LevelDebug)
-
-	cfg := &config.Plugin{
-		Version: "2023.3.0",
-		Path:    "configs/.rr-jobs-err.yaml",
-		Prefix:  "rr",
-	}
-
-	l, oLogger := mocklogger.SlogTestLogger(slog.LevelDebug)
-	err = cont.RegisterAll(
-		cfg,
-		&server.Plugin{},
-		&rpcPlugin.Plugin{},
-		l,
-		&jobs.Plugin{},
-		&resetter.Plugin{},
-		&informer.Plugin{},
-		&googlePubSub.Plugin{},
-	)
-	assert.NoError(t, err)
-
-	err = cont.Init()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ch, err := cont.Serve()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-
-	wg := &sync.WaitGroup{}
-
-	stopCh := make(chan struct{}, 1)
-
-	wg.Go(func() {
-		for {
-			select {
-			case e := <-ch:
-				assert.Fail(t, "error", e.Error.Error())
-				err = cont.Stop()
-				if err != nil {
-					assert.FailNow(t, "error", err.Error())
-				}
-			case <-sig:
-				err = cont.Stop()
-				if err != nil {
-					assert.FailNow(t, "error", err.Error())
-				}
-				return
-			case <-stopCh:
-				// timeout
-				err = cont.Stop()
-				if err != nil {
-					assert.FailNow(t, "error", err.Error())
-				}
-				return
-			}
-		}
-	})
-
-	time.Sleep(time.Second * 3)
-
-	t.Run("DeclarePipeline", helpers.DeclarePipe("rr2", "127.0.0.1:6001", "test-3"))
-	t.Run("ConsumePipeline", helpers.ResumePipes("127.0.0.1:6001", "test-3"))
-	t.Run("PushPipeline", helpers.PushToPipe("test-3", false, "127.0.0.1:6001"))
-	time.Sleep(time.Second * 25)
-	t.Run("PausePipeline", helpers.PausePipelines("127.0.0.1:6001", "test-3"))
-	time.Sleep(time.Second)
-	t.Run("DestroyPipeline", helpers.DestroyPipelines("127.0.0.1:6001", "test-3"))
-
-	time.Sleep(time.Second * 5)
-	stopCh <- struct{}{}
-	wg.Wait()
-
-	require.Equal(t, 1, oLogger.FilterMessageSnippet("job was pushed successfully").Len())
-	require.Equal(t, 4, oLogger.FilterMessageSnippet("job processing was started").Len())
-	require.Equal(t, 1, oLogger.FilterMessageSnippet("job was processed successfully").Len())
-	require.Equal(t, 1, oLogger.FilterMessageSnippet("pipeline was paused").Len())
-	require.Equal(t, 1, oLogger.FilterMessageSnippet("pipeline was resumed").Len())
-	require.Equal(t, 1, oLogger.FilterMessageSnippet("pipeline was stopped").Len())
-
-	time.Sleep(time.Second * 5)
+	rr.RequireLogCount(t, "pipeline was started", 2)
+	rr.RequireLogCount(t, "created subscription, not listening", 2)
+	rr.RequireLogCount(t, "created/used dead letter topic", 1)
 }
 
+// TestPushAndProcess follows two jobs from the rpc call to the worker ack.
+func TestPushAndProcess(t *testing.T) {
+	rr, _ := boot(t, "configs/.rr-init.yaml", rpcAddr)
+
+	helpers.PushToPipe("test-1", false, rpcAddr)(t)
+	helpers.PushToPipe("test-2", false, rpcAddr)(t)
+
+	rr.WaitLog(t, "job was processed successfully", 2)
+
+	helpers.DestroyPipelines(rpcAddr, "test-1", "test-2")(t)
+
+	rr.RequireLogCount(t, "job was pushed successfully", 2)
+	rr.RequireLogCount(t, "job was processed successfully", 2)
+}
+
+// TestAutoAck checks the listener acknowledges the message itself, before the
+// worker ever sees it, when the job carries the auto ack option.
 func TestAutoAck(t *testing.T) {
-	err := helpers.CleanEmulator()
-	if err != nil {
-		assert.FailNow(t, "error", err.Error())
-	}
+	rr, _ := boot(t, "configs/.rr-init.yaml", rpcAddr)
 
-	cont := endure.New(slog.LevelDebug)
+	helpers.PushToPipe("test-1", true, rpcAddr)(t)
+	helpers.PushToPipe("test-2", true, rpcAddr)(t)
 
-	cfg := &config.Plugin{
-		Version: "2023.3.0",
-		Path:    "configs/.rr-init.yaml",
-		Prefix:  "rr",
-	}
+	rr.WaitLog(t, "job was processed successfully", 2)
 
-	l, oLogger := mocklogger.SlogTestLogger(slog.LevelDebug)
-	err = cont.RegisterAll(
-		cfg,
-		&server.Plugin{},
-		&rpcPlugin.Plugin{},
-		l,
-		&jobs.Plugin{},
-		&resetter.Plugin{},
-		&informer.Plugin{},
-		&googlePubSub.Plugin{},
-	)
-	assert.NoError(t, err)
+	helpers.DestroyPipelines(rpcAddr, "test-1", "test-2")(t)
 
-	err = cont.Init()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ch, err := cont.Serve()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-
-	wg := &sync.WaitGroup{}
-
-	stopCh := make(chan struct{}, 1)
-
-	wg.Go(func() {
-		for {
-			select {
-			case e := <-ch:
-				assert.Fail(t, "error", e.Error.Error())
-				err = cont.Stop()
-				if err != nil {
-					assert.FailNow(t, "error", err.Error())
-				}
-			case <-sig:
-				err = cont.Stop()
-				if err != nil {
-					assert.FailNow(t, "error", err.Error())
-				}
-				return
-			case <-stopCh:
-				// timeout
-				err = cont.Stop()
-				if err != nil {
-					assert.FailNow(t, "error", err.Error())
-				}
-				return
-			}
-		}
-	})
-
-	time.Sleep(time.Second * 3)
-	t.Run("PushPipeline", helpers.PushToPipe("test-1", true, "127.0.0.1:6001"))
-	t.Run("PushPipeline", helpers.PushToPipe("test-2", true, "127.0.0.1:6001"))
-	time.Sleep(time.Second * 2)
-	t.Run("DestroyPipeline", helpers.DestroyPipelines("127.0.0.1:6001", "test-1", "test-2"))
-
-	stopCh <- struct{}{}
-	wg.Wait()
-
-	require.Equal(t, 2, oLogger.FilterMessageSnippet("auto ack is turned on, message acknowledged").Len())
+	rr.RequireLogCount(t, "auto ack is turned on, message acknowledged", 2)
 }
 
-func TestRemovePQ(t *testing.T) {
-	err := helpers.CleanEmulator()
-	if err != nil {
-		assert.FailNow(t, "error", err.Error())
+// TestDeclareAndConsume declares a pipeline over rpc, runs a job through it and
+// pauses it again.
+func TestDeclareAndConsume(t *testing.T) {
+	rr, _ := boot(t, "configs/.rr-declare.yaml", rpcAddr)
+
+	helpers.DeclarePipe("rr1", rpcAddr, declared)(t)
+	helpers.ResumePipes(rpcAddr, declared)(t)
+	rr.WaitLog(t, "pipeline was resumed", 1)
+
+	helpers.PushToPipe(declared, false, rpcAddr)(t)
+	rr.WaitLog(t, "job was processed successfully", 1)
+
+	helpers.PausePipelines(rpcAddr, declared)(t)
+	rr.WaitLog(t, "pipeline was paused", 1)
+
+	helpers.DestroyPipelines(rpcAddr, declared)(t)
+
+	rr.RequireLogCount(t, "job was processed successfully", 1)
+	rr.RequireLogCount(t, "pipeline was stopped", 1)
+}
+
+// TestDeclareRejectsIncompleteConfig covers the pipeline options the driver
+// cannot fill in for the caller.
+func TestDeclareRejectsIncompleteConfig(t *testing.T) {
+	boot(t, "configs/.rr-declare.yaml", rpcAddr)
+
+	for name, tc := range map[string]struct {
+		pipeline map[string]string
+		want     string
+	}{
+		"no project id": {
+			pipeline: map[string]string{"driver": "google_pub_sub", "name": "no-project", "topic": "rr1"},
+			want:     "project_id is required",
+		},
+		"no topic": {
+			pipeline: map[string]string{"driver": "google_pub_sub", "name": "no-topic", "project_id": "test"},
+			want:     "topic is required",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.ErrorContains(t, helpers.Declare(t, rpcAddr, tc.pipeline), tc.want)
+		})
+	}
+}
+
+// TestRequeueRetriesUntilAck covers the worker that requeues a job with a
+// growing attempts header and only acks on the fourth delivery. The old test
+// slept out the three five second delays instead of following the records.
+func TestRequeueRetriesUntilAck(t *testing.T) {
+	rr, _ := boot(t, "configs/.rr-jobs-err.yaml", rpcAddr)
+
+	helpers.DeclarePipe("rr2", rpcAddr, declared)(t)
+	helpers.ResumePipes(rpcAddr, declared)(t)
+	helpers.PushToPipe(declared, false, rpcAddr)(t)
+
+	rr.WaitLog(t, "job was processed successfully", 1)
+
+	helpers.PausePipelines(rpcAddr, declared)(t)
+	helpers.DestroyPipelines(rpcAddr, declared)(t)
+
+	// one original delivery plus the three the worker requeued
+	rr.RequireLogCount(t, "job processing was started", 4)
+	rr.RequireLogCount(t, "job was pushed successfully", 1)
+	rr.RequireLogCount(t, "job was processed successfully", 1)
+	rr.RequireLogCount(t, "pipeline was paused", 1)
+	rr.RequireLogCount(t, "pipeline was resumed", 1)
+	rr.RequireLogCount(t, "pipeline was stopped", 1)
+}
+
+// TestDestroyDropsUnprocessedJobs pushes far more jobs than the two slow
+// workers can finish and destroys both pipelines while they are still busy.
+// Nothing may be reported as processed, and both listeners have to come down.
+func TestDestroyDropsUnprocessedJobs(t *testing.T) {
+	const rounds = 10
+
+	rr, _ := boot(t, "configs/.rr-pq.yaml", pqAddr)
+
+	for range rounds {
+		helpers.PushToPipe("test-3", false, pqAddr)(t)
+		helpers.PushToPipe("test-4", false, pqAddr)(t)
 	}
 
-	cont := endure.New(slog.LevelDebug)
+	rr.RequireLogCount(t, "job was pushed successfully", 2*rounds)
 
-	cfg := &config.Plugin{
-		Version: "2024.1.0",
-		Path:    "configs/.rr-pq.yaml",
-		Prefix:  "rr",
-	}
+	// both workers have to be busy before the destroy, otherwise the test would
+	// pass without ever exercising the in-flight path
+	rr.WaitLog(t, "job processing was started", 2)
 
-	l, oLogger := mocklogger.SlogTestLogger(slog.LevelDebug)
-	err = cont.RegisterAll(
-		cfg,
-		&server.Plugin{},
-		&rpcPlugin.Plugin{},
-		l,
-		&jobs.Plugin{},
-		&resetter.Plugin{},
-		&informer.Plugin{},
-		&googlePubSub.Plugin{},
-	)
-	assert.NoError(t, err)
+	helpers.DestroyPipelines(pqAddr, "test-3", "test-4")(t)
 
-	err = cont.Init()
-	if err != nil {
-		t.Fatal(err)
-	}
+	rr.RequireLogCount(t, "pipeline was started", 2)
+	rr.RequireLogCount(t, "pipeline was stopped", 2)
+	rr.RequireLogCount(t, "listener was stopped", 2)
 
-	ch, err := cont.Serve()
-	if err != nil {
-		t.Fatal(err)
-	}
+	// the workers sleep far longer than the destroy takes, so no job can have
+	// reached an ack
+	require.Zero(t, rr.CountLog("job was processed successfully"))
+}
 
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+// TestMalformedAttributesFallBack publishes straight to the topic with values
+// RoadRunner would never write, so the listener has to fall back rather than
+// drop the message.
+func TestMalformedAttributesFallBack(t *testing.T) {
+	rr, _ := boot(t, "configs/.rr-init.yaml", rpcAddr)
 
-	wg := &sync.WaitGroup{}
-
-	stopCh := make(chan struct{}, 1)
-
-	wg.Go(func() {
-		for {
-			select {
-			case e := <-ch:
-				assert.Fail(t, "error", e.Error.Error())
-				err = cont.Stop()
-				if err != nil {
-					assert.FailNow(t, "error", err.Error())
-				}
-			case <-sig:
-				err = cont.Stop()
-				if err != nil {
-					assert.FailNow(t, "error", err.Error())
-				}
-				return
-			case <-stopCh:
-				// timeout
-				err = cont.Stop()
-				if err != nil {
-					assert.FailNow(t, "error", err.Error())
-				}
-				return
-			}
-		}
+	helpers.PublishRaw(t, "rrTopic1", []byte(`{"hello":"world"}`), map[string]string{
+		"rr_id":       "raw-id",
+		"rr_job":      "some/php/namespace",
+		"rr_headers":  "not-json",
+		"rr_delay":    "soon",
+		"rr_priority": "high",
 	})
 
-	time.Sleep(time.Second * 3)
+	rr.WaitLog(t, "job was processed successfully", 1)
 
-	for range 10 {
-		t.Run("PushPipeline", helpers.PushToPipe("test-3", false, "127.0.0.1:6601"))
-		t.Run("PushPipeline", helpers.PushToPipe("test-4", false, "127.0.0.1:6601"))
+	rr.RequireLogCount(t, "failed to unpack the headers, not a JSON", 1)
+	rr.RequireLogCount(t, "failed to unpack the delay, not a number", 1)
+	rr.RequireLogCount(t, "failed to unpack the priority; inheriting the pipeline's default priority", 1)
+
+	helpers.DestroyPipelines(rpcAddr, "test-1", "test-2")(t)
+}
+
+// TestPauseStopsConsuming checks a paused pipeline still accepts pushes but
+// leaves them on the topic until it is resumed.
+func TestPauseStopsConsuming(t *testing.T) {
+	rr, _ := boot(t, "configs/.rr-init.yaml", rpcAddr)
+
+	helpers.PausePipelines(rpcAddr, "test-1")(t)
+	rr.WaitLog(t, "pipeline was paused", 1)
+
+	helpers.PushToPipe("test-1", false, rpcAddr)(t)
+	rr.WaitLog(t, "job was pushed successfully", 1)
+
+	rr.NeverLog(t, "job was processed successfully")
+
+	helpers.ResumePipes(rpcAddr, "test-1")(t)
+	rr.WaitLog(t, "job was processed successfully", 1)
+
+	helpers.DestroyPipelines(rpcAddr, "test-1", "test-2")(t)
+}
+
+// TestStatsReportPipelineIdentity covers the state the driver reports. Pub/Sub
+// keeps the counters on the Google side, so only the identity is filled in.
+func TestStatsReportPipelineIdentity(t *testing.T) {
+	rr, _ := boot(t, "configs/.rr-init.yaml", rpcAddr)
+
+	stats := helpers.Stats(t, rpcAddr)
+	require.Len(t, stats, 2)
+
+	byPipeline := make(map[string]string, len(stats))
+	for _, s := range stats {
+		byPipeline[s.GetPipeline()] = s.GetQueue()
+		require.Equal(t, "google_pub_sub", s.GetDriver())
+		require.Zero(t, s.GetActive())
+		require.Zero(t, s.GetDelayed())
+		require.Zero(t, s.GetReserved())
 	}
-	time.Sleep(time.Second * 3)
 
-	t.Run("DestroyPipeline", helpers.DestroyPipelines("127.0.0.1:6601", "test-3", "test-4"))
+	require.Equal(t, map[string]string{"test-1": "rrTopic1", "test-2": "rrTopic2"}, byPipeline)
 
-	stopCh <- struct{}{}
-	wg.Wait()
-	time.Sleep(time.Second * 5)
-
-	assert.Equal(t, 0, oLogger.FilterMessageSnippet("job was processed successfully").Len())
-	assert.Equal(t, 2, oLogger.FilterMessageSnippet("pipeline was started").Len())
-	assert.Equal(t, 2, oLogger.FilterMessageSnippet("pipeline was stopped").Len())
-	assert.Equal(t, 20, oLogger.FilterMessageSnippet("job was pushed successfully").Len())
-	// "job processing was started" fires once per job pulled by the listener (jobs/listener.go),
-	// not once per worker. The pool has 4 workers across 2 pipelines, so 4 is the minimum;
-	// the actual count fluctuates with Pub/Sub pull timing (8-9 observed across runs).
-	assert.GreaterOrEqual(t, oLogger.FilterMessageSnippet("job processing was started").Len(), 4)
-	assert.Equal(t, 2, oLogger.FilterMessageSnippet("listener was stopped").Len())
+	rr.WaitLog(t, "State method is not implemented", 2)
 }

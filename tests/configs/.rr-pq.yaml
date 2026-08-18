@@ -22,7 +22,8 @@ jobs:
   pool:
     num_workers: 2
     allocate_timeout: 60s
-    destroy_timeout: 60s
+    # the workers outlive the destroy on purpose, so cap the wait
+    destroy_timeout: 5s
 
   pipelines:
     test-3:

@@ -278,7 +278,14 @@ func (d *Driver) State(ctx context.Context) (*jobs.State, error) {
 
 	d.log.Warn("State method is not implemented, please, use Google PubSub monitoring tools")
 
-	return nil, nil
+	pipe := *d.pipeline.Load()
+
+	return &jobs.State{
+		Priority: uint64(pipe.Priority()), //nolint:gosec
+		Pipeline: pipe.Name(),
+		Driver:   pipe.Driver(),
+		Queue:    d.topicStr,
+	}, nil
 }
 
 func (d *Driver) Pause(ctx context.Context, p string) error {
@@ -302,6 +309,9 @@ func (d *Driver) Pause(ctx context.Context, p string) error {
 	d.log.Debug("stop listening for messages", "driver", pipe.Driver(), "pipeline", pipe.Name(), "start", start)
 
 	d.listeners.Add(^uint32(0))
+	// the counter alone does not reach the subscriber, the receive context has
+	// to be canceled or the listener keeps pulling into the priority queue
+	d.checkCtxAndCancel()
 
 	d.log.Debug("pipeline was paused", "driver", pipe.Driver(), "pipeline", pipe.Name(), "start", time.Now().UTC(), "elapsed", time.Since(start))
 

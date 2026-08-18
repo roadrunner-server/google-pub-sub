@@ -1,7 +1,12 @@
 services:
   pub-sub-emulator:
-    image: google/cloud-sdk:latest
-    platform: linux/amd64
+    # the emulators tag carries the pubsub emulator alone and is built for arm64 as well
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:542.0.0-emulators
     command: ["gcloud", "beta", "emulators", "pubsub", "start", "--host-port=0.0.0.0:8085", "--project=test"]
     ports:
-      - "0.0.0.0:8085:8085"
+      - "127.0.0.1:8085:8085"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "</dev/tcp/127.0.0.1/8085"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
