@@ -42,7 +42,7 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.21 // indirect
-	github.com/googleapis/gax-go/v2 v2.23.0 // indirect
+	github.com/googleapis/gax-go/v2 v2.24.0 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
