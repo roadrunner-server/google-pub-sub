@@ -8,7 +8,7 @@ require (
 	cloud.google.com/go/pubsub/v2 v2.6.2
 	github.com/google/uuid v1.6.0
 	github.com/roadrunner-server/api-go/v6 v6.0.0-beta.14
-	github.com/roadrunner-server/config/v6 v6.0.0-beta.3
+	github.com/roadrunner-server/config/v6 v6.0.0-beta.4
 	github.com/roadrunner-server/endure/v2 v2.6.2
 	github.com/roadrunner-server/google-pub-sub/v6 v6.0.0
 	github.com/roadrunner-server/goridge/v4 v4.0.0-beta.3
