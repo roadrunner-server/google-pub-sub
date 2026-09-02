@@ -2,7 +2,7 @@ module github.com/roadrunner-server/google-pub-sub/v6
 
 go 1.27
 
-toolchain go1.27.0
+toolchain go1.27.1
 
 require (
 	cloud.google.com/go/pubsub/v2 v2.7.0
@@ -15,7 +15,7 @@ require (
 	go.opentelemetry.io/otel v1.46.0
 	go.opentelemetry.io/otel/sdk v1.46.0
 	go.opentelemetry.io/otel/trace v1.46.0
-	google.golang.org/api v0.296.0
+	google.golang.org/api v0.297.0
 	google.golang.org/grpc v1.83.2
 )
 

@@ -2,7 +2,7 @@ module tests
 
 go 1.27
 
-toolchain go1.27.0
+toolchain go1.27.1
 
 require (
 	cloud.google.com/go/pubsub/v2 v2.7.0
@@ -19,7 +19,7 @@ require (
 	github.com/roadrunner-server/rpc/v6 v6.0.0-beta.6
 	github.com/roadrunner-server/server/v6 v6.0.0-beta.7
 	github.com/stretchr/testify v1.12.1
-	google.golang.org/api v0.296.0
+	google.golang.org/api v0.297.0
 	google.golang.org/grpc v1.83.2
 )
 
