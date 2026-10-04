@@ -52,8 +52,6 @@ type Driver struct {
 
 	// events
 	eventsCh chan events.Event
-	eventBus *events.Bus
-	id       string
 
 	// pubsub specific
 	gclient             *pubsub.Client
@@ -123,9 +121,6 @@ func FromConfig(ctx context.Context, tracer *sdktrace.TracerProvider, configKey 
 		return nil, err
 	}
 
-	eventsCh := make(chan events.Event, 1)
-	eventBus, id := events.NewEventBus()
-
 	jb := &Driver{
 		tracer:              tracer,
 		prop:                prop,
@@ -138,9 +133,7 @@ func FromConfig(ctx context.Context, tracer *sdktrace.TracerProvider, configKey 
 		gclient:             gclient,
 
 		// events
-		eventsCh: eventsCh,
-		eventBus: eventBus,
-		id:       id,
+		eventsCh: make(chan events.Event, 1),
 	}
 
 	err = jb.manageSubscriptions()
@@ -201,9 +194,6 @@ func FromPipeline(ctx context.Context, tracer *sdktrace.TracerProvider, pipe job
 		return nil, err
 	}
 
-	eventsCh := make(chan events.Event, 1)
-	eventBus, id := events.NewEventBus()
-
 	jb := &Driver{
 		prop:                prop,
 		tracer:              tracer,
@@ -216,9 +206,7 @@ func FromPipeline(ctx context.Context, tracer *sdktrace.TracerProvider, pipe job
 		gclient:             gclient,
 
 		// events
-		eventsCh: eventsCh,
-		eventBus: eventBus,
-		id:       id,
+		eventsCh: make(chan events.Event, 1),
 	}
 
 	err = jb.manageSubscriptions()
