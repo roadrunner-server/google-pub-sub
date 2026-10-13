@@ -17,7 +17,7 @@ require (
 	github.com/roadrunner-server/logger/v6 v6.0.0-beta.4
 	github.com/roadrunner-server/resetter/v6 v6.0.0-beta.6
 	github.com/roadrunner-server/rpc/v6 v6.0.0-beta.6
-	github.com/roadrunner-server/server/v6 v6.0.0-beta.7
+	github.com/roadrunner-server/server/v6 v6.0.0
 	github.com/stretchr/testify v1.12.1
 	google.golang.org/api v0.300.0
 	google.golang.org/grpc v1.84.0
