@@ -5,7 +5,7 @@ go 1.27
 toolchain go1.27.2
 
 require (
-	cloud.google.com/go/pubsub/v2 v2.7.0
+	cloud.google.com/go/pubsub/v2 v2.8.0
 	github.com/google/uuid v1.6.0
 	github.com/roadrunner-server/api-go/v6 v6.1.0
 	github.com/roadrunner-server/config/v6 v6.0.0

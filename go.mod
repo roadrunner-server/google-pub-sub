@@ -5,7 +5,7 @@ go 1.27
 toolchain go1.27.2
 
 require (
-	cloud.google.com/go/pubsub/v2 v2.7.0
+	cloud.google.com/go/pubsub/v2 v2.8.0
 	github.com/roadrunner-server/api-plugins/v6 v6.0.0
 	github.com/roadrunner-server/endure/v2 v2.7.0
 	github.com/roadrunner-server/errors v1.6.0
