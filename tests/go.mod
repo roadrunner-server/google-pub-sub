@@ -20,7 +20,7 @@ require (
 	github.com/roadrunner-server/server/v6 v6.0.0
 	github.com/stretchr/testify v1.12.1
 	google.golang.org/api v0.309.0
-	google.golang.org/grpc v1.84.0
+	google.golang.org/grpc v1.85.0
 )
 
 replace github.com/roadrunner-server/google-pub-sub/v6 => ..
