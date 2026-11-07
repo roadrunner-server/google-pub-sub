@@ -2,7 +2,7 @@ package pubsubjobs
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	stderr "errors"
 	"fmt"
 	"maps"
