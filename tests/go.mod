@@ -19,7 +19,7 @@ require (
 	github.com/roadrunner-server/rpc/v6 v6.0.0
 	github.com/roadrunner-server/server/v6 v6.0.0
 	github.com/stretchr/testify v1.12.1
-	google.golang.org/api v0.310.0
+	google.golang.org/api v0.311.0
 	google.golang.org/grpc v1.85.0
 )
 
